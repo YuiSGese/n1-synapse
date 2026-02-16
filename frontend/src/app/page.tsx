@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { Settings, LogOut, User, FolderOpen, RefreshCcw, FilePlus, FolderPlus, Menu, Plus, LayoutPanelLeft } from 'lucide-react'
+import { Settings, LogOut, User, FolderOpen, RefreshCcw, FilePlus, FolderPlus, Menu, Plus, CheckCircle2, TrendingUp } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +20,7 @@ import { FolderTree, TreeNode } from '@/components/dashboard/folder-tree'
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
+import { Progress } from "@/components/ui/progress"
 
 type Deck = {
   id: string
@@ -28,6 +29,9 @@ type Deck = {
   type: string
   parent_id: string | null
   description?: string
+  // Các trường tính toán
+  total_cards?: number
+  progress_percent?: number // % Tiến độ thật sự
 }
 
 export default function Home() {
@@ -37,7 +41,6 @@ export default function Home() {
   const [allItems, setAllItems] = useState<Deck[]>([])
   const [loading, setLoading] = useState(true)
   
-  // State quản lý tab trên mobile
   const [mobileTab, setMobileTab] = useState("in_progress")
 
   const [createDialog, setCreateDialog] = useState<{
@@ -54,16 +57,60 @@ export default function Home() {
     router.push(`/decks/${id}`)
   }
 
+  // --- LOGIC TÍNH ĐIỂM TIẾN ĐỘ ---
+  const calculateDeckProgress = (vocabs: any[]) => {
+    if (!vocabs || vocabs.length === 0) return 0
+    
+    let totalScore = 0
+    
+    vocabs.forEach(v => {
+      const interval = v.interval || 0
+      
+      // Quy tắc 7 ngày (Farming Logic)
+      if (interval > 7) totalScore += 100      // Đã thuộc (Master)
+      else if (interval > 3) totalScore += 80  // Nhớ tốt
+      else if (interval > 1) totalScore += 50  // Đang ôn
+      else if (interval > 0) totalScore += 20  // Mới học
+      else totalScore += 0                     // Chưa học
+    })
+
+    return Math.round(totalScore / vocabs.length)
+  }
+
   const fetchAllData = useCallback(async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      // 1. Lấy danh sách Decks
+      const { data: decksData, error: decksError } = await supabase
         .from('decks')
         .select('*')
         .order('name', { ascending: true })
       
-      if (error) throw error
-      if (data) setAllItems(data as Deck[])
+      if (decksError) throw decksError
+
+      // 2. Lấy danh sách Vocab (chỉ cần lấy deck_id và interval để tính toán cho nhẹ)
+      const { data: vocabData, error: vocabError } = await supabase
+        .from('vocab')
+        .select('deck_id, interval')
+      
+      if (vocabError) throw vocabError
+
+      // 3. Map dữ liệu để tính tiến độ cho từng Deck
+      const decksWithProgress = decksData.map((deck: any) => {
+        // Lọc ra các từ thuộc deck này
+        const deckVocabs = vocabData?.filter((v: any) => v.deck_id === deck.id) || []
+        
+        // Tính %
+        const progress = calculateDeckProgress(deckVocabs)
+        
+        return {
+          ...deck,
+          total_cards: deckVocabs.length,
+          progress_percent: progress
+        }
+      })
+
+      setAllItems(decksWithProgress as Deck[])
     } catch (error) {
       console.error("Lỗi tải dữ liệu:", error)
       toast.error("Không thể tải dữ liệu")
@@ -144,7 +191,6 @@ export default function Home() {
   if (!user) return null
   const userInitials = user.email ? user.email.substring(0, 2).toUpperCase() : "U"
 
-  // Component Nội dung Sidebar
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-zinc-50">
         <div className="p-3 border-b border-zinc-200 flex justify-between items-center bg-white sticky top-0 z-10 group">
@@ -173,7 +219,6 @@ export default function Home() {
     </div>
   )
 
-  // Component render một cột Kanban
   const KanbanColumn = ({ title, items, color, bgClass, status }: any) => (
     <div 
         className={cn("flex-1 flex flex-col rounded-xl border-2 transition-colors h-full", bgClass)}
@@ -201,19 +246,44 @@ export default function Home() {
                     )}
                     onClick={() => handleNavigate(deck.id)}
                     >
-                        <div className="flex justify-between items-start mb-1">
+                        <div className="flex justify-between items-start mb-2">
                             <span className="text-[10px] font-bold uppercase text-zinc-400 border px-1 rounded">{deck.type}</span>
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDelete(deck.id, deck.type)
+                                }}
+                                className="p-1 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <Settings className="h-3 w-3" />
+                            </button>
                         </div>
-                        <h3 className={cn("font-semibold text-sm text-zinc-800", status === 'DONE' && "line-through")}>{deck.name}</h3>
-                        <button 
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                handleDelete(deck.id, deck.type)
-                            }}
-                            className="absolute top-3 right-3 p-1 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                            <Settings className="h-3 w-3" />
-                        </button>
+                        
+                        <h3 className={cn("font-semibold text-sm text-zinc-800 mb-3", status === 'DONE' && "line-through")}>{deck.name}</h3>
+                        
+                        {/* PROGRESS BAR - HIỂN THỊ SỐ LIỆU THẬT */}
+                        {status === 'IN_PROGRESS' && (
+                            <div className="space-y-1">
+                                <div className="flex justify-between text-[10px] text-zinc-400">
+                                    <span className="flex items-center gap-1">
+                                      <TrendingUp className="w-3 h-3" /> 
+                                      Tiến độ ({deck.total_cards || 0} từ)
+                                    </span>
+                                    <span>{deck.progress_percent || 0}%</span>
+                                </div>
+                                {/* Sửa lỗi: Dùng [&>*]:bg-blue-500 để đổi màu indicator */}
+                                <Progress 
+                                  value={deck.progress_percent || 0} 
+                                  className="h-1.5 bg-zinc-100 [&>*]:bg-blue-500" 
+                                />
+                            </div>
+                        )}
+
+                        {status === 'DONE' && (
+                            <div className="flex items-center gap-1 text-[10px] text-green-600 font-medium">
+                                <CheckCircle2 className="w-3 h-3" /> Hoàn thành
+                            </div>
+                        )}
                     </div>
                 ))
             )}
@@ -224,7 +294,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans text-zinc-900 overflow-hidden fixed inset-0">
       
-      {/* Dialog Tạo Mới (Dùng chung) - Ẩn trigger mặc định bằng span hidden */}
       <CreateDeckDialog 
         open={createDialog.open}
         onOpenChange={(val) => setCreateDialog(prev => ({ ...prev, open: val }))}
@@ -234,10 +303,8 @@ export default function Home() {
         trigger={<span className="hidden"></span>}
       />
 
-      {/* HEADER */}
       <header className="h-14 border-b border-zinc-200 bg-white flex items-center justify-between px-4 sticky top-0 z-50 shrink-0">
         <div className="flex items-center gap-3">
-            {/* MOBILE MENU TRIGGER */}
             <div className="md:hidden">
                 <Sheet>
                     <SheetTrigger asChild>
@@ -259,14 +326,12 @@ export default function Home() {
                 </Sheet>
             </div>
 
-            {/* LOGO */}
             <div className="flex items-center gap-2 cursor-pointer select-none">
                 <div className="w-6 h-6 bg-zinc-900 text-white flex items-center justify-center font-bold text-xs rounded-sm hidden md:flex">N1</div>
                 <span className="font-bold text-lg tracking-tight">Synapse</span>
             </div>
         </div>
 
-        {/* USER MENU */}
         <div className="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -287,18 +352,12 @@ export default function Home() {
         </div>
       </header>
 
-      {/* BODY */}
       <div className="flex-1 flex overflow-hidden">
-        
-        {/* DESKTOP SIDEBAR */}
         <aside className="w-72 border-r border-zinc-200 bg-zinc-50 hidden md:flex flex-col">
           <SidebarContent />
         </aside>
 
-        {/* MAIN CONTENT AREA */}
         <main className="flex-1 bg-white flex flex-col overflow-hidden relative">
-            
-            {/* DESKTOP VIEW (3 Cột) */}
             <div className="hidden md:flex flex-row gap-6 p-6 h-full max-w-6xl mx-auto w-full">
                 <KanbanColumn 
                     title="Đang học" 
@@ -316,7 +375,6 @@ export default function Home() {
                 />
             </div>
 
-            {/* MOBILE VIEW (Tabs + FAB) */}
             <div className="md:hidden flex-1 flex flex-col h-full">
                 <Tabs value={mobileTab} onValueChange={setMobileTab} className="flex-1 flex flex-col">
                     <div className="px-4 pt-2 pb-2 bg-white border-b border-zinc-100 shrink-0">
@@ -358,7 +416,6 @@ export default function Home() {
                     </div>
                 </Tabs>
 
-                {/* FAB (Floating Action Button) - Chỉ hiện trên Mobile */}
                 <div className="absolute bottom-6 right-6 z-50">
                     <CreateDeckDialog 
                         open={createDialog.open}
