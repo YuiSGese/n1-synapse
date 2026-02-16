@@ -29,9 +29,9 @@ type Deck = {
   type: string
   parent_id: string | null
   description?: string
-  // Các trường tính toán
+  // Các trường tính toán từ View
   total_cards?: number
-  progress_percent?: number // % Tiến độ thật sự
+  progress_percent?: number 
 }
 
 export default function Home() {
@@ -57,63 +57,25 @@ export default function Home() {
     router.push(`/decks/${id}`)
   }
 
-  // --- LOGIC TÍNH ĐIỂM TIẾN ĐỘ ---
-  const calculateDeckProgress = (vocabs: any[]) => {
-    if (!vocabs || vocabs.length === 0) return 0
-    
-    let totalScore = 0
-    
-    vocabs.forEach(v => {
-      const interval = v.interval || 0
-      
-      // Quy tắc 7 ngày (Farming Logic)
-      if (interval > 7) totalScore += 100      // Đã thuộc (Master)
-      else if (interval > 3) totalScore += 80  // Nhớ tốt
-      else if (interval > 1) totalScore += 50  // Đang ôn
-      else if (interval > 0) totalScore += 20  // Mới học
-      else totalScore += 0                     // Chưa học
-    })
-
-    return Math.round(totalScore / vocabs.length)
-  }
-
+  // --- LOGIC TẢI DỮ LIỆU ĐÃ ĐƯỢC TỐI ƯU ---
   const fetchAllData = useCallback(async () => {
     setLoading(true)
     try {
-      // 1. Lấy danh sách Decks
-      const { data: decksData, error: decksError } = await supabase
-        .from('decks')
+      // Thay vì query bảng 'decks' thường, ta query vào VIEW 'decks_with_progress'
+      // View này đã tự động tính sẵn total_cards và progress_percent từ phía Database
+      const { data, error } = await supabase
+        .from('decks_with_progress') // <--- Tên View vừa tạo
         .select('*')
         .order('name', { ascending: true })
       
-      if (decksError) throw decksError
+      if (error) throw error
 
-      // 2. Lấy danh sách Vocab (chỉ cần lấy deck_id và interval để tính toán cho nhẹ)
-      const { data: vocabData, error: vocabError } = await supabase
-        .from('vocab')
-        .select('deck_id, interval')
-      
-      if (vocabError) throw vocabError
-
-      // 3. Map dữ liệu để tính tiến độ cho từng Deck
-      const decksWithProgress = decksData.map((deck: any) => {
-        // Lọc ra các từ thuộc deck này
-        const deckVocabs = vocabData?.filter((v: any) => v.deck_id === deck.id) || []
-        
-        // Tính %
-        const progress = calculateDeckProgress(deckVocabs)
-        
-        return {
-          ...deck,
-          total_cards: deckVocabs.length,
-          progress_percent: progress
-        }
-      })
-
-      setAllItems(decksWithProgress as Deck[])
+      if (data) {
+        setAllItems(data as Deck[])
+      }
     } catch (error) {
       console.error("Lỗi tải dữ liệu:", error)
-      toast.error("Không thể tải dữ liệu")
+      toast.error("Không thể tải dữ liệu. Hãy chắc chắn bạn đã chạy file SQL cập nhật Database!")
     } finally {
       setLoading(false)
     }
@@ -146,10 +108,17 @@ export default function Home() {
 
   const handleDelete = async (id: string, type: string) => {
     if (!confirm(`Bạn có chắc chắn muốn xóa ${type === 'folder' ? 'thư mục' : 'bài học'} này không?`)) return
+    
+    // Optimistic Update
     setAllItems(prev => prev.filter(item => item.id !== id))
+    
     const { error } = await supabase.from('decks').delete().eq('id', id)
-    if (error) { toast.error("Lỗi khi xóa"); fetchAllData() }
-    else { toast.success("Đã xóa thành công") }
+    if (error) { 
+        toast.error("Lỗi khi xóa")
+        fetchAllData() // Revert nếu lỗi
+    } else { 
+        toast.success("Đã xóa thành công") 
+    }
   }
 
   const treeData = useMemo(() => {
@@ -176,11 +145,17 @@ export default function Home() {
     e.preventDefault()
     const deckId = e.dataTransfer.getData("deckId")
     if (!deckId) return
+    
     const updatedItems = allItems.map(item => item.id === deckId ? { ...item, status: newStatus } : item)
     setAllItems(updatedItems)
+    
     const { error } = await supabase.from('decks').update({ status: newStatus }).eq('id', deckId)
-    if (error) { toast.error("Lỗi cập nhật"); fetchAllData() }
-    else { toast.success(newStatus === 'IN_PROGRESS' ? "Bắt đầu học bài này!" : "Đã hoàn thành!") }
+    if (error) { 
+        toast.error("Lỗi cập nhật")
+        fetchAllData() 
+    } else { 
+        toast.success(newStatus === 'IN_PROGRESS' ? "Bắt đầu học bài này!" : "Đã hoàn thành!") 
+    }
   }
   const handleDragOver = (e: React.DragEvent) => e.preventDefault()
 
@@ -271,7 +246,6 @@ export default function Home() {
                                     </span>
                                     <span>{deck.progress_percent || 0}%</span>
                                 </div>
-                                {/* Sửa lỗi: Dùng [&>*]:bg-blue-500 để đổi màu indicator */}
                                 <Progress 
                                   value={deck.progress_percent || 0} 
                                   className="h-1.5 bg-zinc-100 [&>*]:bg-blue-500" 

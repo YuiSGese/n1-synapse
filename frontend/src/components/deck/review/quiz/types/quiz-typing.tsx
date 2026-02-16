@@ -4,9 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { CheckCircle2, XCircle, Timer } from 'lucide-react'
+import { Check, X, ArrowRight, Timer, RefreshCcw } from 'lucide-react'
 
-// Hàm đọc text
 const speakText = (text: string) => {
   if (typeof window !== 'undefined') {
     window.speechSynthesis.cancel()
@@ -24,33 +23,34 @@ interface QuizTypingProps {
 export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
   const [input, setInput] = useState('')
   const [status, setStatus] = useState<'idle' | 'wrong' | 'correct'>('idle')
-  const [hasFailed, setHasFailed] = useState(false) // Đánh dấu đã sai lần nào chưa
-  const [showAnswer, setShowAnswer] = useState(false) // Trạng thái hiện đáp án trong 5s
-  const [countdown, setCountdown] = useState(3) // Đếm ngược
+  const [hasFailed, setHasFailed] = useState(false)
+  const [showAnswer, setShowAnswer] = useState(false)
+  const [countdown, setCountdown] = useState(5)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Reset khi sang câu mới
   useEffect(() => {
-    inputRef.current?.focus()
+    // Tự động focus, nhưng trên mobile đôi khi cần user tap để tránh nhảy layout loạn xạ
+    // Tuy nhiên với game typing thì auto-focus vẫn tiện hơn.
+    setTimeout(() => inputRef.current?.focus(), 100)
+    
     setInput('')
     setStatus('idle')
     setHasFailed(false)
     setShowAnswer(false)
   }, [vocab])
 
-  // Logic đếm ngược 5s
+  // Logic đếm ngược 5s khi sai
   useEffect(() => {
     let timer: NodeJS.Timeout
     if (showAnswer) {
-      setCountdown(3)
+      setCountdown(5)
       timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(timer)
-            // Hết giờ: Ẩn đáp án, reset form để nhập lại
             setShowAnswer(false)
             setStatus('idle')
-            setInput('') // Xóa cái sai đi
+            setInput('')
             setTimeout(() => inputRef.current?.focus(), 100)
             return 0
           }
@@ -63,101 +63,107 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault()
-    // Nếu đang đúng, hoặc đang hiện đáp án, hoặc chưa nhập gì -> Chặn submit
     if (status === 'correct' || showAnswer || !input.trim()) return
 
-    // Chuẩn hóa: Bỏ Romaji
     const correctReading = vocab.reading ? vocab.reading.split('(')[0].trim() : ""
     const userInput = input.trim()
 
     if (userInput === correctReading) {
-      // --- ĐÚNG ---
       setStatus('correct')
       speakText(vocab.word)
-
-      // Chuyển câu sau 1.5s
-      // Nếu đã từng sai (hasFailed=true) thì kết quả là FALSE để hệ thống SRS biết mà nhắc lại
       setTimeout(() => {
         onResult(!hasFailed)
-      }, 1500)
-
+      }, 1000)
     } else {
-      // --- SAI ---
       setStatus('wrong')
       setHasFailed(true)
-      setShowAnswer(true) // Kích hoạt chế độ hiện đáp án 5s
+      setShowAnswer(true)
     }
   }
 
+  // Icon nút bấm thay đổi theo trạng thái
+  const ActionIcon = () => {
+    if (status === 'correct') return <Check className="w-5 h-5" />
+    if (showAnswer) return <span className="font-mono text-xs">{countdown}s</span>
+    return <ArrowRight className="w-5 h-5" />
+  }
+
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full max-w-lg mx-auto p-4 animate-in zoom-in-95 duration-300">
+    // SỬA: justify-start để nội dung dồn lên trên, pt-4 để cách header 1 chút
+    <div className="flex flex-col items-center justify-start h-full w-full max-w-md mx-auto p-4 pt-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
       
-      {/* CÂU HỎI */}
-      <div className="w-full bg-white border-2 border-zinc-100 rounded-3xl p-8 mb-8 shadow-sm flex flex-col items-center justify-center min-h-[200px] relative overflow-hidden">
-        <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-4">
-          Nhập cách đọc (Hiragana)
+      {/* CÂU HỎI - Tối ưu diện tích */}
+      <div className="w-full bg-white border-2 border-zinc-100 rounded-3xl p-6 mb-6 shadow-sm flex flex-col items-center justify-center relative overflow-hidden shrink-0">
+        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">
+          Nhập Hiragana
         </span>
-        <h2 className="text-6xl md:text-7xl font-black text-zinc-900 text-center break-words leading-tight">
+        {/* Giảm size chữ trên mobile để không bị quá to */}
+        <h2 className="text-5xl md:text-7xl font-black text-zinc-900 text-center break-words leading-tight">
           {vocab.word}
         </h2>
-        <p className="text-zinc-300 mt-4 font-medium text-sm text-center">
+        {/* Ẩn nghĩa khi đang nhập để tăng độ khó, hoặc hiện mờ */}
+        <p className="text-zinc-300 mt-2 font-medium text-xs text-center line-clamp-1">
             {vocab.meaning}
         </p>
       </div>
 
-      {/* INPUT */}
-      <form onSubmit={handleSubmit} className="w-full space-y-4">
-        <div className="relative">
+      {/* FORM NHẬP LIỆU - Tích hợp nút vào trong */}
+      <form onSubmit={handleSubmit} className="w-full space-y-4 shrink-0">
+        <div className="relative group">
             <Input
                 ref={inputRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
-                disabled={status === 'correct' || showAnswer} // Khóa khi đang hiện đáp án 5s
-                placeholder="Nhập Hiragana..." 
+                onChange={(e) => {
+                    setInput(e.target.value)
+                    if (status === 'wrong') setStatus('idle')
+                }}
+                disabled={status === 'correct' || showAnswer}
+                placeholder="nhập cách đọc..." 
                 autoComplete="off" 
                 autoCorrect="off" 
                 autoCapitalize="off"
+                // SỬA: padding-right lớn để chứa nút, text-lg cho dễ đọc trên mobile
                 className={cn(
-                    "h-16 text-center text-xl font-bold rounded-2xl border-2 transition-all duration-300 shadow-sm",
-                    status === 'correct' && "border-green-500 bg-green-50 text-green-900 ring-2 ring-green-200",
-                    status === 'wrong' && "border-red-500 bg-red-50 text-red-900 ring-2 ring-red-200",
+                    "h-14 md:h-16 pr-14 pl-6 text-center text-xl font-bold rounded-2xl border-2 transition-all duration-300 shadow-sm placeholder:font-normal placeholder:text-zinc-300",
+                    status === 'correct' && "border-green-500 bg-green-50 text-green-900",
+                    status === 'wrong' && "border-red-500 bg-red-50 text-red-900",
                     status === 'idle' && "border-zinc-200 focus:border-zinc-900 focus:ring-4 focus:ring-zinc-100"
                 )}
             />
             
-            {/* Icons trạng thái */}
-            <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                {status === 'correct' && <CheckCircle2 className="h-6 w-6 text-green-600 animate-in zoom-in" />}
-                {status === 'wrong' && <XCircle className="h-6 w-6 text-red-600 animate-in zoom-in" />}
+            {/* BUTTON NẰM TRONG INPUT */}
+            <div className="absolute right-2 top-2 bottom-2">
+                <Button 
+                    type="submit"
+                    size="icon"
+                    disabled={status === 'correct' || showAnswer || !input.trim()}
+                    className={cn(
+                        "h-full w-10 md:w-12 rounded-xl transition-all shadow-none",
+                        status === 'correct' ? "bg-green-500 hover:bg-green-600 text-white" :
+                        status === 'wrong' ? "bg-red-500 hover:bg-red-600 text-white" :
+                        "bg-zinc-900 text-white hover:bg-zinc-700"
+                    )}
+                >
+                    <ActionIcon />
+                </Button>
             </div>
         </div>
 
-        {/* HIỂN THỊ ĐÁP ÁN ĐÚNG TRONG 5S */}
+        {/* HIỂN THỊ ĐÁP ÁN KHI SAI (Compact) */}
         <div className={cn(
-            "text-center transition-all duration-300 overflow-hidden ease-in-out",
-            showAnswer ? "h-24 opacity-100 py-2" : "h-0 opacity-0"
+            "text-center transition-all duration-300 overflow-hidden",
+            showAnswer ? "h-auto opacity-100 mt-2" : "h-0 opacity-0 mt-0"
         )}>
-            <div className="flex items-center justify-center gap-2 mb-2 text-red-500 animate-pulse font-medium text-sm">
-               <Timer className="w-4 h-4" /> Ghi nhớ đáp án trong {countdown}s...
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 rounded-lg border border-red-100">
+                <span className="text-[10px] text-red-400 uppercase font-bold">Đáp án:</span>
+                <span className="text-lg font-black text-red-600 tracking-wider">{vocab.reading}</span>
             </div>
-            <div className="px-6 py-3 bg-red-50 rounded-xl border border-red-100 inline-block shadow-sm">
-                <span className="text-2xl font-black text-red-600 tracking-wider">{vocab.reading}</span>
-            </div>
+            <p className="text-[10px] text-zinc-400 mt-1 animate-pulse">Ghi nhớ để nhập lại...</p>
         </div>
-
-        <Button 
-            type="submit" 
-            disabled={status === 'correct' || showAnswer || !input.trim()}
-            className={cn(
-                "w-full h-14 rounded-xl text-lg font-bold shadow-lg transition-all",
-                status === 'correct' ? "bg-green-600 hover:bg-green-700" : 
-                showAnswer ? "bg-zinc-100 text-zinc-400 border border-zinc-200 shadow-none cursor-not-allowed" :
-                "bg-zinc-900 hover:bg-zinc-800 hover:translate-y-[-2px]"
-            )}
-        >
-            {status === 'correct' ? "Chính xác!" : showAnswer ? "Đang hiện đáp án..." : "Kiểm tra"}
-        </Button>
       </form>
+      
+      {/* Spacer dẻo để đẩy nội dung lên trên, tránh bàn phím che */}
+      <div className="flex-1 min-h-[100px]" /> 
     </div>
   )
 }
