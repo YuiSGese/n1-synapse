@@ -139,12 +139,12 @@ export default function Home() {
 
   const inProgressDecks = allItems.filter(i => i.status === 'IN_PROGRESS' && i.type !== 'folder')
   const doneDecks = allItems.filter(i => i.status === 'DONE' && i.type !== 'folder')
-  const todoDecks = allItems.filter(i => i.status === 'TODO' && i.type !== 'folder') // Dành cho tab mobile
+  const todoDecks = allItems.filter(i => i.status === 'TODO' && i.type !== 'folder') 
 
   if (!user) return null
   const userInitials = user.email ? user.email.substring(0, 2).toUpperCase() : "U"
 
-  // Component Nội dung Sidebar (Tách ra để dùng chung cho cả Desktop và Mobile)
+  // Component Nội dung Sidebar
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-zinc-50">
         <div className="p-3 border-b border-zinc-200 flex justify-between items-center bg-white sticky top-0 z-10 group">
@@ -173,7 +173,7 @@ export default function Home() {
     </div>
   )
 
-  // Component render một cột Kanban (hoặc 1 tab content)
+  // Component render một cột Kanban
   const KanbanColumn = ({ title, items, color, bgClass, status }: any) => (
     <div 
         className={cn("flex-1 flex flex-col rounded-xl border-2 transition-colors h-full", bgClass)}
@@ -224,13 +224,14 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans text-zinc-900 overflow-hidden fixed inset-0">
       
-      {/* Dialog Tạo Mới (Dùng chung) */}
+      {/* Dialog Tạo Mới (Dùng chung) - Ẩn trigger mặc định bằng span hidden */}
       <CreateDeckDialog 
         open={createDialog.open}
         onOpenChange={(val) => setCreateDialog(prev => ({ ...prev, open: val }))}
         parentId={createDialog.parentId}
         type={createDialog.type}
         onCreated={fetchAllData}
+        trigger={<span className="hidden"></span>}
       />
 
       {/* HEADER */}
@@ -362,7 +363,7 @@ export default function Home() {
                     <CreateDeckDialog 
                         open={createDialog.open}
                         onOpenChange={(val) => setCreateDialog(prev => ({ ...prev, open: val }))}
-                        parentId={null} // Mặc định tạo ở root khi bấm FAB
+                        parentId={null} 
                         type={createDialog.type}
                         onCreated={fetchAllData}
                         trigger={
