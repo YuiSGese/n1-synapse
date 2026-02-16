@@ -10,6 +10,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -22,15 +23,18 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Loader2, FolderPlus, FilePlus } from 'lucide-react'
+import { Loader2, Plus, FolderPlus, FilePlus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 // Props mới: Điều khiển từ bên ngoài (Controlled)
 interface CreateDeckDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   parentId: string | null
-  type: 'folder' | 'deck' // Chế độ tạo
+  type: 'folder' | 'deck'
   onCreated: () => void
+  trigger?: React.ReactNode // <--- Cho phép truyền nút bấm tùy chỉnh (FAB)
 }
 
 export function CreateDeckDialog({ 
@@ -38,7 +42,8 @@ export function CreateDeckDialog({
   onOpenChange, 
   parentId, 
   type,
-  onCreated 
+  onCreated,
+  trigger
 }: CreateDeckDialogProps) {
   const [loading, setLoading] = useState(false)
   const [name, setName] = useState('')
@@ -64,8 +69,6 @@ export function CreateDeckDialog({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("Chưa đăng nhập")
 
-      // Nếu là folder -> type = 'folder'
-      // Nếu là bài học -> type = 'vocab' / 'kanji' ... (lấy từ dropdown)
       const finalType = type === 'folder' ? 'folder' : contentType
 
       const { error } = await supabase.from('decks').insert({
@@ -74,14 +77,14 @@ export function CreateDeckDialog({
         description: description,
         type: finalType,
         status: 'TODO', 
-        parent_id: parentId // Tạo đúng chỗ user đang chọn
+        parent_id: parentId
       })
 
       if (error) throw error
 
       toast.success(`Đã tạo ${type === 'folder' ? 'thư mục' : 'bài học'} mới!`)
-      onOpenChange(false) // Đóng dialog
-      onCreated() // Reload data
+      onOpenChange(false) 
+      onCreated() 
 
     } catch (error: any) {
       toast.error(error.message || "Lỗi khi tạo")
@@ -94,7 +97,19 @@ export function CreateDeckDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] border-zinc-200 shadow-2xl">
+      {/* Nếu có trigger truyền vào thì dùng, không thì dùng nút mặc định */}
+      {trigger ? (
+        <DialogTrigger asChild>{trigger}</DialogTrigger>
+      ) : (
+        <DialogTrigger asChild>
+          <Button size="sm" className="bg-zinc-900 text-white hover:bg-zinc-800 border-zinc-900 shadow-none gap-2">
+            <Plus className="h-4 w-4" />
+            <span>Tạo mới</span>
+          </Button>
+        </DialogTrigger>
+      )}
+      
+      <DialogContent className="sm:max-w-[425px] border-zinc-200 shadow-2xl rounded-xl w-[90%] md:w-full">
         <DialogHeader>
           <div className="flex items-center gap-3 mb-2">
             <div className={`p-2 rounded-lg ${isFolder ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}>
@@ -105,14 +120,14 @@ export function CreateDeckDialog({
                 {isFolder ? 'Tạo Thư mục mới' : 'Tạo Bài học mới'}
               </DialogTitle>
               <DialogDescription className="text-xs mt-1">
-                {parentId ? 'Sẽ được tạo bên trong thư mục đang chọn' : 'Sẽ được tạo tại Thư mục gốc'}
+                {parentId ? 'Tạo bên trong thư mục hiện tại' : 'Tạo tại Thư mục gốc'}
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
         <div className="grid gap-5 py-2">
-          {/* Tên - Luôn hiện */}
+          {/* Tên */}
           <div className="grid gap-2">
             <Label htmlFor="name" className="text-zinc-500 font-medium">Tên {isFolder ? 'Thư mục' : 'Bài học'}</Label>
             <Input 
@@ -125,7 +140,7 @@ export function CreateDeckDialog({
             />
           </div>
 
-          {/* Các trường mở rộng - Chỉ hiện khi tạo Bài học (File) */}
+          {/* Các trường mở rộng */}
           {!isFolder && (
             <>
               <div className="grid gap-2">
@@ -157,7 +172,7 @@ export function CreateDeckDialog({
           )}
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 sm:justify-end">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Hủy</Button>
           <Button onClick={handleCreate} disabled={loading} className="bg-zinc-900 text-white hover:bg-zinc-800">
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

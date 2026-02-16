@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { Settings, LogOut, User, FolderOpen, RefreshCcw, FilePlus, FolderPlus } from 'lucide-react'
+import { Settings, LogOut, User, FolderOpen, RefreshCcw, FilePlus, FolderPlus, Menu, Plus, LayoutPanelLeft } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +17,9 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { CreateDeckDialog } from '@/components/dashboard/create-deck-dialog'
 import { FolderTree, TreeNode } from '@/components/dashboard/folder-tree'
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { cn } from "@/lib/utils"
 
 type Deck = {
   id: string
@@ -33,6 +36,9 @@ export default function Home() {
   const [user, setUser] = useState<any>(null)
   const [allItems, setAllItems] = useState<Deck[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // State quản lý tab trên mobile
+  const [mobileTab, setMobileTab] = useState("in_progress")
 
   const [createDialog, setCreateDialog] = useState<{
     open: boolean;
@@ -44,7 +50,6 @@ export default function Home() {
     type: 'folder'
   })
 
-  // Hàm điều hướng sang trang chi tiết
   const handleNavigate = (id: string) => {
     router.push(`/decks/${id}`)
   }
@@ -134,13 +139,92 @@ export default function Home() {
 
   const inProgressDecks = allItems.filter(i => i.status === 'IN_PROGRESS' && i.type !== 'folder')
   const doneDecks = allItems.filter(i => i.status === 'DONE' && i.type !== 'folder')
+  const todoDecks = allItems.filter(i => i.status === 'TODO' && i.type !== 'folder') // Dành cho tab mobile
 
   if (!user) return null
   const userInitials = user.email ? user.email.substring(0, 2).toUpperCase() : "U"
 
+  // Component Nội dung Sidebar (Tách ra để dùng chung cho cả Desktop và Mobile)
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full bg-zinc-50">
+        <div className="p-3 border-b border-zinc-200 flex justify-between items-center bg-white sticky top-0 z-10 group">
+            <h2 className="font-bold text-xs text-zinc-500 uppercase tracking-wider flex items-center gap-2">
+              <FolderOpen className="h-3.5 w-3.5" /> Kho dữ liệu
+            </h2>
+            <div className="flex items-center gap-1">
+               <button onClick={() => openCreateFile(null)} className="p-1 hover:bg-zinc-100 rounded" title="Tạo bài học gốc"><FilePlus className="h-4 w-4 text-zinc-600" /></button>
+               <button onClick={() => openCreateFolder(null)} className="p-1 hover:bg-zinc-100 rounded" title="Tạo thư mục gốc"><FolderPlus className="h-4 w-4 text-zinc-600" /></button>
+               <button onClick={fetchAllData} className="p-1 hover:bg-zinc-100 rounded" title="Tải lại"><RefreshCcw className="h-3.5 w-3.5 text-zinc-600" /></button>
+            </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2">
+            <FolderTree 
+              data={treeData} 
+              onDragStart={handleDragStart} 
+              onCreateFolder={openCreateFolder}
+              onCreateFile={openCreateFile}
+              onDelete={handleDelete}
+              onNavigate={handleNavigate}
+            />
+        </div>
+        <div className="p-3 bg-zinc-100 text-[10px] text-zinc-400 text-center border-t border-zinc-200 hidden md:block">
+            Kéo bài học sang bên phải để bắt đầu học
+        </div>
+    </div>
+  )
+
+  // Component render một cột Kanban (hoặc 1 tab content)
+  const KanbanColumn = ({ title, items, color, bgClass, status }: any) => (
+    <div 
+        className={cn("flex-1 flex flex-col rounded-xl border-2 transition-colors h-full", bgClass)}
+        onDragOver={handleDragOver} 
+        onDrop={(e) => handleDrop(e, status)}
+    >
+        <div className={cn("p-4 border-b rounded-t-xl flex justify-between", color)}>
+            <h2 className="font-bold text-sm flex items-center gap-2">
+                {title}
+                <span className="text-xs bg-white px-2 py-0.5 rounded-full opacity-80">{items.length}</span>
+            </h2>
+        </div>
+        <div className="flex-1 p-3 space-y-3 overflow-y-auto min-h-[200px]">
+            {items.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-zinc-400 text-sm opacity-60">
+                    <p>Trống</p>
+                </div>
+            ) : (
+                items.map((deck: Deck) => (
+                    <div 
+                    key={deck.id} 
+                    className={cn(
+                        "bg-white p-4 rounded-xl border shadow-sm relative group cursor-pointer transition-all active:scale-95",
+                        status === 'DONE' ? "border-zinc-200 opacity-60" : "border-blue-200 hover:shadow-md hover:border-blue-300"
+                    )}
+                    onClick={() => handleNavigate(deck.id)}
+                    >
+                        <div className="flex justify-between items-start mb-1">
+                            <span className="text-[10px] font-bold uppercase text-zinc-400 border px-1 rounded">{deck.type}</span>
+                        </div>
+                        <h3 className={cn("font-semibold text-sm text-zinc-800", status === 'DONE' && "line-through")}>{deck.name}</h3>
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                handleDelete(deck.id, deck.type)
+                            }}
+                            className="absolute top-3 right-3 p-1 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                            <Settings className="h-3 w-3" />
+                        </button>
+                    </div>
+                ))
+            )}
+        </div>
+    </div>
+  )
+
   return (
-    <div className="min-h-screen bg-white flex flex-col font-sans text-zinc-900">
+    <div className="min-h-screen bg-white flex flex-col font-sans text-zinc-900 overflow-hidden fixed inset-0">
       
+      {/* Dialog Tạo Mới (Dùng chung) */}
       <CreateDeckDialog 
         open={createDialog.open}
         onOpenChange={(val) => setCreateDialog(prev => ({ ...prev, open: val }))}
@@ -150,11 +234,38 @@ export default function Home() {
       />
 
       {/* HEADER */}
-      <header className="h-14 border-b border-zinc-200 bg-white flex items-center justify-between px-4 sticky top-0 z-50">
-        <div className="flex items-center gap-2 cursor-pointer select-none">
-          <div className="w-6 h-6 bg-zinc-900 text-white flex items-center justify-center font-bold text-xs rounded-sm">N1</div>
-          <span className="font-bold text-lg tracking-tight">Synapse</span>
+      <header className="h-14 border-b border-zinc-200 bg-white flex items-center justify-between px-4 sticky top-0 z-50 shrink-0">
+        <div className="flex items-center gap-3">
+            {/* MOBILE MENU TRIGGER */}
+            <div className="md:hidden">
+                <Sheet>
+                    <SheetTrigger asChild>
+                        <Button variant="ghost" size="icon" className="-ml-2">
+                            <Menu className="h-5 w-5 text-zinc-600" />
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="p-0 w-80">
+                        <SheetHeader className="p-4 border-b border-zinc-100">
+                            <SheetTitle className="text-left flex items-center gap-2">
+                                <div className="w-6 h-6 bg-zinc-900 text-white flex items-center justify-center font-bold text-xs rounded-sm">N1</div>
+                                Synapse
+                            </SheetTitle>
+                        </SheetHeader>
+                        <div className="h-full pb-20">
+                            <SidebarContent />
+                        </div>
+                    </SheetContent>
+                </Sheet>
+            </div>
+
+            {/* LOGO */}
+            <div className="flex items-center gap-2 cursor-pointer select-none">
+                <div className="w-6 h-6 bg-zinc-900 text-white flex items-center justify-center font-bold text-xs rounded-sm hidden md:flex">N1</div>
+                <span className="font-bold text-lg tracking-tight">Synapse</span>
+            </div>
         </div>
+
+        {/* USER MENU */}
         <div className="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -169,98 +280,103 @@ export default function Home() {
               <DropdownMenuLabel>Tài khoản</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem><User className="mr-2 h-4 w-4" /> Hồ sơ</DropdownMenuItem>
-              <DropdownMenuItem><Settings className="mr-2 h-4 w-4" /> Cài đặt</DropdownMenuItem>
-              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout} className="text-red-600"><LogOut className="mr-2 h-4 w-4" /> Đăng xuất</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden h-[calc(100vh-56px)]">
+      {/* BODY */}
+      <div className="flex-1 flex overflow-hidden">
         
-        {/* SIDEBAR */}
-        <aside className="w-72 border-r border-zinc-200 bg-zinc-50 flex flex-col">
-          <div className="p-3 border-b border-zinc-200 flex justify-between items-center bg-white sticky top-0 z-10 group">
-            <h2 className="font-bold text-xs text-zinc-500 uppercase tracking-wider flex items-center gap-2">
-              <FolderOpen className="h-3.5 w-3.5" /> Explorer
-            </h2>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-               <button onClick={() => openCreateFile(null)} className="p-1 hover:bg-zinc-100 rounded" title="Tạo bài học gốc"><FilePlus className="h-4 w-4 text-zinc-600" /></button>
-               <button onClick={() => openCreateFolder(null)} className="p-1 hover:bg-zinc-100 rounded" title="Tạo thư mục gốc"><FolderPlus className="h-4 w-4 text-zinc-600" /></button>
-               <button onClick={fetchAllData} className="p-1 hover:bg-zinc-100 rounded" title="Tải lại"><RefreshCcw className="h-3.5 w-3.5 text-zinc-600" /></button>
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto p-2">
-            <FolderTree 
-              data={treeData} 
-              onDragStart={handleDragStart} 
-              onCreateFolder={openCreateFolder}
-              onCreateFile={openCreateFile}
-              onDelete={handleDelete}
-              onNavigate={handleNavigate} // <--- Truyền hàm điều hướng vào đây
-            />
-          </div>
+        {/* DESKTOP SIDEBAR */}
+        <aside className="w-72 border-r border-zinc-200 bg-zinc-50 hidden md:flex flex-col">
+          <SidebarContent />
         </aside>
 
-        {/* MAIN KANBAN */}
-        <main className="flex-1 bg-white p-6 overflow-y-auto">
-          <div className="max-w-5xl mx-auto h-full flex flex-col md:flex-row gap-6">
+        {/* MAIN CONTENT AREA */}
+        <main className="flex-1 bg-white flex flex-col overflow-hidden relative">
             
-            {/* IN PROGRESS */}
-            <div className="flex-1 flex flex-col rounded-xl bg-blue-50/30 border-2 border-dashed border-blue-100"
-              onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'IN_PROGRESS')}>
-              <div className="p-4 border-b border-blue-100 bg-blue-50/50 rounded-t-xl flex justify-between">
-                <h2 className="font-bold text-blue-900 text-sm flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-500"></span> Đang học
-                  <span className="text-xs bg-white px-2 py-0.5 rounded-full text-blue-500">{inProgressDecks.length}</span>
-                </h2>
-              </div>
-              <div className="flex-1 p-3 space-y-3 min-h-[200px]">
-                {inProgressDecks.map(deck => (
-                   <div 
-                    key={deck.id} 
-                    className="bg-white p-3 rounded border border-blue-200 shadow-sm relative group cursor-pointer hover:shadow-md transition-all"
-                    onClick={() => handleNavigate(deck.id)} // <--- Click vào Kanban cũng chuyển trang
-                   >
-                      <h3 className="font-medium text-sm text-zinc-800">{deck.name}</h3>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation() // Chặn click lan ra ngoài
-                          handleDelete(deck.id, deck.type)
-                        }}
-                        className="absolute top-2 right-2 p-1 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Settings className="h-3 w-3" />
-                      </button>
-                   </div>
-                ))}
-              </div>
+            {/* DESKTOP VIEW (3 Cột) */}
+            <div className="hidden md:flex flex-row gap-6 p-6 h-full max-w-6xl mx-auto w-full">
+                <KanbanColumn 
+                    title="Đang học" 
+                    items={inProgressDecks} 
+                    status="IN_PROGRESS" 
+                    bgClass="bg-blue-50/30 border-dashed border-blue-100" 
+                    color="text-blue-900 bg-blue-50/50 border-blue-100"
+                />
+                <KanbanColumn 
+                    title="Hoàn thành" 
+                    items={doneDecks} 
+                    status="DONE" 
+                    bgClass="bg-zinc-50 border-zinc-200" 
+                    color="text-zinc-500 bg-zinc-100 border-zinc-200"
+                />
             </div>
 
-            {/* DONE */}
-            <div className="flex-1 flex flex-col rounded-xl bg-zinc-50 border border-zinc-200"
-              onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'DONE')}>
-              <div className="p-4 border-b border-zinc-200 bg-zinc-100 rounded-t-xl flex justify-between">
-                <h2 className="font-bold text-zinc-500 text-sm flex items-center gap-2">
-                   <span className="w-2 h-2 rounded-full bg-green-500"></span> Hoàn thành
-                   <span className="text-xs bg-white px-2 py-0.5 rounded-full text-zinc-500">{doneDecks.length}</span>
-                </h2>
-              </div>
-               <div className="flex-1 p-3 space-y-3 min-h-[200px]">
-                 {doneDecks.map(deck => (
-                    <div 
-                      key={deck.id} 
-                      className="bg-white p-3 rounded border border-zinc-200 opacity-60 hover:opacity-100 transition-all cursor-pointer"
-                      onClick={() => handleNavigate(deck.id)} // <--- Click vào Kanban cũng chuyển trang
-                    >
-                      <h3 className="font-medium text-sm text-zinc-800 line-through">{deck.name}</h3>
+            {/* MOBILE VIEW (Tabs + FAB) */}
+            <div className="md:hidden flex-1 flex flex-col h-full">
+                <Tabs value={mobileTab} onValueChange={setMobileTab} className="flex-1 flex flex-col">
+                    <div className="px-4 pt-2 pb-2 bg-white border-b border-zinc-100 shrink-0">
+                        <TabsList className="grid w-full grid-cols-3 bg-zinc-100/50">
+                            <TabsTrigger value="todo" className="text-xs">Hàng chờ</TabsTrigger>
+                            <TabsTrigger value="in_progress" className="text-xs font-bold text-blue-700 data-[state=active]:bg-white data-[state=active]:shadow-sm">Đang học</TabsTrigger>
+                            <TabsTrigger value="done" className="text-xs text-zinc-500">Xong</TabsTrigger>
+                        </TabsList>
                     </div>
-                  ))}
-              </div>
+
+                    <div className="flex-1 overflow-hidden p-4 bg-zinc-50/30">
+                        <TabsContent value="todo" className="h-full mt-0">
+                            <KanbanColumn 
+                                title="Hàng chờ (Mới tạo)" 
+                                items={todoDecks} 
+                                status="TODO" 
+                                bgClass="bg-white border-zinc-100 shadow-sm" 
+                                color="text-zinc-700 border-zinc-100 bg-white"
+                            />
+                        </TabsContent>
+                        <TabsContent value="in_progress" className="h-full mt-0">
+                            <KanbanColumn 
+                                title="Đang học" 
+                                items={inProgressDecks} 
+                                status="IN_PROGRESS" 
+                                bgClass="bg-blue-50/20 border-blue-100" 
+                                color="text-blue-800 border-blue-100 bg-blue-50"
+                            />
+                        </TabsContent>
+                        <TabsContent value="done" className="h-full mt-0">
+                            <KanbanColumn 
+                                title="Đã hoàn thành" 
+                                items={doneDecks} 
+                                status="DONE" 
+                                bgClass="bg-zinc-50 border-zinc-200" 
+                                color="text-zinc-500 border-zinc-200 bg-zinc-100"
+                            />
+                        </TabsContent>
+                    </div>
+                </Tabs>
+
+                {/* FAB (Floating Action Button) - Chỉ hiện trên Mobile */}
+                <div className="absolute bottom-6 right-6 z-50">
+                    <CreateDeckDialog 
+                        open={createDialog.open}
+                        onOpenChange={(val) => setCreateDialog(prev => ({ ...prev, open: val }))}
+                        parentId={null} // Mặc định tạo ở root khi bấm FAB
+                        type={createDialog.type}
+                        onCreated={fetchAllData}
+                        trigger={
+                            <Button 
+                                onClick={() => openCreateFile(null)} 
+                                className="h-14 w-14 rounded-full shadow-xl bg-zinc-900 hover:bg-zinc-800 text-white flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
+                            >
+                                <Plus className="h-6 w-6" />
+                            </Button>
+                        }
+                    />
+                </div>
             </div>
 
-          </div>
         </main>
       </div>
     </div>
