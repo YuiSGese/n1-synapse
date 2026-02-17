@@ -90,13 +90,13 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
 
   return (
     // SỬA: justify-start để nội dung dồn lên trên, pt-4 để cách header 1 chút
-    <div className="flex flex-col items-center justify-start h-full w-full max-w-md mx-auto p-4 pt-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+    <div className="flex flex-col items-center justify-start h-full w-full max-w-md mx-auto p-4 pt-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
       
       {/* CÂU HỎI - Tối ưu diện tích */}
-      <div className="w-full bg-white border-2 border-zinc-100 rounded-3xl p-6 mb-6 shadow-sm flex flex-col items-center justify-center relative overflow-hidden shrink-0">
-        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">
+      <div className="w-full bg-white border-2 border-zinc-100 rounded-3xl p-4 mb-6 shadow-sm flex flex-col items-center justify-center relative overflow-hidden shrink-0">
+        {/* <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">
           Nhập Hiragana
-        </span>
+        </span> */}
         {/* Giảm size chữ trên mobile để không bị quá to */}
         <h2 className="text-5xl md:text-7xl font-black text-zinc-900 text-center break-words leading-tight">
           {vocab.word}

@@ -182,7 +182,7 @@ export function QuizSession({ vocabList, mode, onExit }: QuizSessionProps) {
   return (
     <div className="h-full flex flex-col">
         {/* Header */}
-        <div className="h-16 border-b border-zinc-100 flex items-center px-4 md:px-8 justify-between shrink-0">
+        <div className="h-10 flex items-center px-4 md:px-8 justify-between shrink-0">
             <Button variant="ghost" size="icon" onClick={onExit} className="text-zinc-400 hover:text-zinc-900">
                 <ArrowLeft className="w-5 h-5" />
             </Button>
@@ -191,7 +191,7 @@ export function QuizSession({ vocabList, mode, onExit }: QuizSessionProps) {
                     <span>Quiz Progress</span>
                     <span>{Math.round(progressVal)}%</span>
                 </div>
-                <Progress value={progressVal} className="h-2" />
+                <Progress value={progressVal} className="h-1" />
             </div>
             <div className="w-9" />
         </div>
