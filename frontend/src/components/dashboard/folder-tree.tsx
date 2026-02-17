@@ -1,15 +1,23 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, Folder, FileText, FolderPlus, FilePlus, Trash2, PlayCircle, CheckCircle2 } from 'lucide-react'
+import { ChevronRight, ChevronDown, Folder, FileText, FolderPlus, FilePlus, Trash2, PlayCircle, CheckCircle2, MoreHorizontal, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+  ContextMenuLabel,
+} from "@/components/ui/context-menu"
 
 export type TreeNode = {
   id: string
   name: string
   type: string
   children?: TreeNode[]
-  status?: string // 'TODO' | 'IN_PROGRESS' | 'DONE'
+  status?: string
 }
 
 interface FolderTreeProps {
@@ -18,16 +26,18 @@ interface FolderTreeProps {
   onCreateFolder: (parentId: string) => void
   onCreateFile: (parentId: string) => void
   onDelete: (id: string, type: string) => void
-  onNavigate: (id: string) => void // <--- Thêm prop này
+  onNavigate: (id: string) => void
+  onRename: (id: string, name: string, type: string) => void // <--- Callback mới
 }
 
-function TreeItem({ node, onDragStart, onCreateFolder, onCreateFile, onDelete, onNavigate }: { 
+function TreeItem({ node, onDragStart, onCreateFolder, onCreateFile, onDelete, onNavigate, onRename }: { 
   node: TreeNode, 
   onDragStart: any,
   onCreateFolder: (id: string) => void,
   onCreateFile: (id: string) => void,
   onDelete: (id: string, type: string) => void,
-  onNavigate: (id: string) => void
+  onNavigate: (id: string) => void,
+  onRename: (id: string, name: string, type: string) => void
 }) {
   const [isOpen, setIsOpen] = useState(false)
   
@@ -42,6 +52,7 @@ function TreeItem({ node, onDragStart, onCreateFolder, onCreateFile, onDelete, o
     }
   }
 
+  // Nút hành động nhanh (cho Desktop Hover)
   const ActionButton = ({ icon: Icon, onClick, title, className }: any) => (
     <button 
       onClick={(e) => {
@@ -62,62 +73,94 @@ function TreeItem({ node, onDragStart, onCreateFolder, onCreateFile, onDelete, o
     return null
   }
 
-  // Xử lý Click chính
   const handleClick = () => {
     if (isFolder) {
-      setIsOpen(!isOpen) // Nếu là folder -> Mở/Đóng
+      setIsOpen(!isOpen)
     } else {
-      onNavigate(node.id) // Nếu là file -> Chuyển trang
+      onNavigate(node.id)
     }
   }
 
   return (
-    <div className="pl-4 select-none">
-      <div 
-        className={cn(
-          "flex items-center gap-1.5 py-1 px-2 rounded-md transition-colors cursor-pointer group pr-2",
-          isFolder ? "hover:bg-zinc-100 text-zinc-700" : "hover:bg-blue-50 text-zinc-600 hover:text-blue-700"
-        )}
-        onClick={handleClick} // <--- Gắn sự kiện vào đây
-        draggable={!isFolder}
-        onDragStart={handleDragStart}
-      >
-        <span className="w-4 h-4 flex items-center justify-center shrink-0">
-          {isFolder && (
-            hasChildren ? (
-              isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />
-            ) : <div className="w-3" />
-          )}
-        </span>
+    <div className="select-none">
+      <ContextMenu>
+        <ContextMenuTrigger>
+          <div 
+            className={cn(
+              "flex items-center gap-1.5 py-1.5 px-2 rounded-md transition-colors cursor-pointer group pr-2 ml-4", // ml-4 để thụt đầu dòng
+              isFolder ? "hover:bg-zinc-100 text-zinc-700" : "hover:bg-blue-50 text-zinc-600 hover:text-blue-700"
+            )}
+            onClick={handleClick}
+            draggable={!isFolder}
+            onDragStart={handleDragStart}
+          >
+            <span className="w-4 h-4 flex items-center justify-center shrink-0">
+              {isFolder && (
+                hasChildren ? (
+                  isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />
+                ) : <div className="w-3" />
+              )}
+            </span>
 
-        {isFolder ? (
-          <Folder className={cn("h-4 w-4 fill-zinc-100 text-zinc-400 group-hover:text-zinc-600", isOpen && "fill-zinc-200")} />
-        ) : (
-          <FileText className="h-4 w-4 text-blue-300 group-hover:text-blue-500" />
-        )}
+            {isFolder ? (
+              <Folder className={cn("h-4 w-4 fill-zinc-100 text-zinc-400 group-hover:text-zinc-600", isOpen && "fill-zinc-200")} />
+            ) : (
+              <FileText className="h-4 w-4 text-blue-300 group-hover:text-blue-500" />
+            )}
 
-        <span className="text-sm truncate flex-1 flex items-center gap-2">
-          {node.name}
-          <StatusIcon />
-        </span>
-        
-        <div className="flex items-center gap-0.5">
+            <span className="text-sm truncate flex-1 flex items-center gap-2">
+              {node.name}
+              <StatusIcon />
+            </span>
+            
+            {/* Desktop Actions (Hover) - Vẫn giữ lại cho tiện trên PC */}
+            <div className="flex items-center gap-0.5 hidden md:flex">
+              {isFolder && (
+                <>
+                  <ActionButton icon={FilePlus} onClick={() => onCreateFile(node.id)} title="Tạo bài học" />
+                  <ActionButton icon={FolderPlus} onClick={() => onCreateFolder(node.id)} title="Tạo thư mục con" />
+                </>
+              )}
+              {/* Thêm nút Rename vào hover desktop luôn */}
+              <ActionButton icon={Pencil} onClick={() => onRename(node.id, node.name, node.type)} title="Đổi tên" />
+              <ActionButton icon={Trash2} onClick={() => onDelete(node.id, node.type)} title="Xóa" className="hover:text-red-600 hover:bg-red-50" />
+            </div>
+
+            {/* Mobile Visual Cue (Dấu 3 chấm để biết có menu) */}
+            <div className="md:hidden text-zinc-300">
+               <MoreHorizontal className="h-4 w-4" />
+            </div>
+          </div>
+        </ContextMenuTrigger>
+
+        {/* MENU NGỮ CẢNH (Right Click / Long Press) */}
+        <ContextMenuContent className="w-48">
+          <ContextMenuLabel>{isFolder ? 'Thư mục' : 'Bài học'}: {node.name}</ContextMenuLabel>
+          <ContextMenuSeparator />
+          
           {isFolder && (
             <>
-              <ActionButton icon={FilePlus} onClick={() => onCreateFile(node.id)} title="Tạo bài học" />
-              <ActionButton icon={FolderPlus} onClick={() => onCreateFolder(node.id)} title="Tạo thư mục con" />
+              <ContextMenuItem onClick={() => onCreateFile(node.id)}>
+                <FilePlus className="mr-2 h-4 w-4" /> Tạo bài học mới
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => onCreateFolder(node.id)}>
+                <FolderPlus className="mr-2 h-4 w-4" /> Tạo thư mục con
+              </ContextMenuItem>
+              <ContextMenuSeparator />
             </>
           )}
           
-          <ActionButton 
-            icon={Trash2} 
-            onClick={() => onDelete(node.id, node.type)} 
-            title="Xóa" 
-            className="hover:text-red-600 hover:bg-red-50"
-          />
-        </div>
-      </div>
+          <ContextMenuItem onClick={() => onRename(node.id, node.name, node.type)}>
+            <Pencil className="mr-2 h-4 w-4" /> Đổi tên
+          </ContextMenuItem>
+          
+          <ContextMenuItem onClick={() => onDelete(node.id, node.type)} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+            <Trash2 className="mr-2 h-4 w-4" /> Xóa bỏ
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
 
+      {/* Render con đệ quy */}
       {isFolder && isOpen && hasChildren && (
         <div className="border-l border-zinc-200 ml-3">
           {node.children!.map(child => (
@@ -128,7 +171,8 @@ function TreeItem({ node, onDragStart, onCreateFolder, onCreateFile, onDelete, o
               onCreateFolder={onCreateFolder}
               onCreateFile={onCreateFile}
               onDelete={onDelete}
-              onNavigate={onNavigate} // Truyền tiếp xuống con
+              onNavigate={onNavigate}
+              onRename={onRename} // Truyền xuống
             />
           ))}
         </div>
@@ -137,7 +181,7 @@ function TreeItem({ node, onDragStart, onCreateFolder, onCreateFile, onDelete, o
   )
 }
 
-export function FolderTree({ data, onDragStart, onCreateFolder, onCreateFile, onDelete, onNavigate }: FolderTreeProps) {
+export function FolderTree({ data, onDragStart, onCreateFolder, onCreateFile, onDelete, onNavigate, onRename }: FolderTreeProps) {
   if (!data || data.length === 0) {
     return <div className="text-zinc-400 text-xs p-4 italic text-center">Chưa có dữ liệu</div>
   }
@@ -153,6 +197,7 @@ export function FolderTree({ data, onDragStart, onCreateFolder, onCreateFile, on
           onCreateFile={onCreateFile}
           onDelete={onDelete}
           onNavigate={onNavigate}
+          onRename={onRename}
         />
       ))}
     </div>
