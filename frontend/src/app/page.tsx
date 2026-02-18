@@ -1,6 +1,6 @@
 'use client'
 
-// ... (Giữ nguyên các import cũ)
+// ... (Các import giữ nguyên)
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback, useMemo } from 'react'
@@ -17,14 +17,14 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { CreateDeckDialog } from '@/components/dashboard/create-deck-dialog'
-import { RenameDialog } from '@/components/dashboard/rename-dialog' // <--- IMPORT MỚI
+import { RenameDialog } from '@/components/dashboard/rename-dialog'
 import { FolderTree, TreeNode } from '@/components/dashboard/folder-tree'
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { Progress } from "@/components/ui/progress"
 
-// ... (Giữ nguyên type Deck)
+// ... (Giữ nguyên Type Deck)
 type Deck = {
   id: string
   name: string
@@ -37,7 +37,7 @@ type Deck = {
 }
 
 export default function Home() {
-  // ... (Giữ nguyên các hook và state cũ)
+  // ... (Giữ nguyên các hook và state)
   const router = useRouter()
   const supabase = createClient()
   const [user, setUser] = useState<any>(null)
@@ -55,7 +55,6 @@ export default function Home() {
     type: 'folder'
   })
 
-  // State cho Rename Dialog
   const [renameDialog, setRenameDialog] = useState<{
     open: boolean;
     id: string | null;
@@ -68,12 +67,11 @@ export default function Home() {
     type: 'deck'
   })
 
-  // ... (Giữ nguyên handleNavigate, calculateDeckProgress, fetchAllData, useEffect checkUser, handleLogout)
-  const handleNavigate = (id: string) => {
-    router.push(`/decks/${id}`)
-  }
+  // ... (Giữ nguyên fetchAllData, useEffects)
+  const handleNavigate = (id: string) => router.push(`/decks/${id}`)
 
   const calculateDeckProgress = (vocabs: any[]) => {
+    // ... (Giữ nguyên logic tính điểm)
     if (!vocabs || vocabs.length === 0) return 0
     let totalScore = 0
     vocabs.forEach(v => {
@@ -116,7 +114,6 @@ export default function Home() {
 
   const handleLogout = async () => { await supabase.auth.signOut(); router.push('/login') }
 
-  // ... (Giữ nguyên handlers Create, Delete)
   const openCreateFolder = (parentId: string | null) => { setCreateDialog({ open: true, parentId, type: 'folder' }) }
   const openCreateFile = (parentId: string | null) => { setCreateDialog({ open: true, parentId, type: 'deck' }) }
   
@@ -127,12 +124,29 @@ export default function Home() {
     if (error) { toast.error("Lỗi khi xóa"); fetchAllData() } else { toast.success("Đã xóa thành công") }
   }
 
-  // --- HANDLER RENAME ---
   const openRenameDialog = (id: string, name: string, type: string) => {
     setRenameDialog({ open: true, id, name, type })
   }
 
-  // ... (Giữ nguyên logic Tree, Drag & Drop)
+  // --- LOGIC MỚI: DI CHUYỂN FILE/FOLDER ---
+  const handleMoveItem = async (dragId: string, targetFolderId: string) => {
+    if (dragId === targetFolderId) return // Không thể thả vào chính nó
+
+    // Optimistic Update
+    setAllItems(prev => prev.map(item => 
+        item.id === dragId ? { ...item, parent_id: targetFolderId } : item
+    ))
+
+    const { error } = await supabase.from('decks').update({ parent_id: targetFolderId }).eq('id', dragId)
+    
+    if (error) {
+        toast.error("Lỗi khi di chuyển")
+        fetchAllData() // Revert
+    } else {
+        toast.success("Đã di chuyển thành công")
+    }
+  }
+
   const treeData = useMemo(() => {
     const nodes = allItems
     const buildTree = (parentId: string | null): TreeNode[] => {
@@ -144,7 +158,9 @@ export default function Home() {
   }, [allItems])
 
   const handleDragStart = (e: React.DragEvent, node: TreeNode) => { e.dataTransfer.setData("deckId", node.id) }
-  const handleDrop = async (e: React.DragEvent, newStatus: 'IN_PROGRESS' | 'DONE') => {
+  
+  // Xử lý drop vào Kanban (Thay đổi trạng thái)
+  const handleDropKanban = async (e: React.DragEvent, newStatus: 'IN_PROGRESS' | 'DONE') => {
     e.preventDefault(); const deckId = e.dataTransfer.getData("deckId"); if (!deckId) return
     const updatedItems = allItems.map(item => item.id === deckId ? { ...item, status: newStatus } : item)
     setAllItems(updatedItems)
@@ -153,7 +169,6 @@ export default function Home() {
   }
   const handleDragOver = (e: React.DragEvent) => e.preventDefault()
 
-  // Filter items
   const inProgressDecks = allItems.filter(i => i.status === 'IN_PROGRESS' && i.type !== 'folder')
   const doneDecks = allItems.filter(i => i.status === 'DONE' && i.type !== 'folder')
   const todoDecks = allItems.filter(i => i.status === 'TODO' && i.type !== 'folder') 
@@ -161,7 +176,6 @@ export default function Home() {
   if (!user) return null
   const userInitials = user.email ? user.email.substring(0, 2).toUpperCase() : "U"
 
-  // Component Nội dung Sidebar
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-zinc-50">
         <div className="p-3 border-b border-zinc-200 flex justify-between items-center bg-white sticky top-0 z-10 group">
@@ -182,18 +196,18 @@ export default function Home() {
               onCreateFile={openCreateFile}
               onDelete={handleDelete}
               onNavigate={handleNavigate}
-              onRename={openRenameDialog} // <--- TRUYỀN HÀM RENAME VÀO
+              onRename={openRenameDialog}
+              onMove={handleMoveItem} // <--- TRUYỀN HÀM DI CHUYỂN
             />
         </div>
         <div className="p-3 bg-zinc-100 text-[10px] text-zinc-400 text-center border-t border-zinc-200 hidden md:block">
-            Mẹo: Chuột phải (hoặc nhấn giữ trên mobile) để xem thêm tùy chọn
+            Mẹo: Kéo thả để sắp xếp thư mục
         </div>
     </div>
   )
 
-  // ... (Giữ nguyên KanbanColumn)
   const KanbanColumn = ({ title, items, color, bgClass, status }: any) => (
-    <div className={cn("flex-1 flex flex-col rounded-xl border-2 transition-colors h-full", bgClass)} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, status)}>
+    <div className={cn("flex-1 flex flex-col rounded-xl border-2 transition-colors h-full", bgClass)} onDragOver={handleDragOver} onDrop={(e) => handleDropKanban(e, status)}>
         <div className={cn("p-4 border-b rounded-t-xl flex justify-between", color)}>
             <h2 className="font-bold text-sm flex items-center gap-2">{title}<span className="text-xs bg-white px-2 py-0.5 rounded-full opacity-80">{items.length}</span></h2>
         </div>
@@ -223,14 +237,14 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans text-zinc-900 overflow-hidden fixed inset-0">
       
-      {/* DIALOGS */}
+      {/* CÁC DIALOG TOÀN CỤC */}
       <CreateDeckDialog 
         open={createDialog.open}
         onOpenChange={(val) => setCreateDialog(prev => ({ ...prev, open: val }))}
         parentId={createDialog.parentId}
         type={createDialog.type}
         onCreated={fetchAllData}
-        trigger={<span className="hidden"></span>}
+        trigger={<span className="hidden"></span>} 
       />
 
       <RenameDialog 
@@ -242,7 +256,7 @@ export default function Home() {
         onRenamed={fetchAllData}
       />
 
-      {/* HEADER & BODY ... (Giữ nguyên) */}
+      {/* ... Header và Sidebar giữ nguyên ... */}
       <header className="h-14 border-b border-zinc-200 bg-white flex items-center justify-between px-4 sticky top-0 z-50 shrink-0">
         <div className="flex items-center gap-3">
             <div className="md:hidden">
@@ -279,8 +293,15 @@ export default function Home() {
                         <TabsContent value="done" className="h-full mt-0"><KanbanColumn title="Đã hoàn thành" items={doneDecks} status="DONE" bgClass="bg-zinc-50 border-zinc-200" color="text-zinc-500 border-zinc-200 bg-zinc-100"/></TabsContent>
                     </div>
                 </Tabs>
+                
+                {/* FIX LỖI FAB MOBILE: Dùng Button thường gọi hàm, không lồng Dialog */}
                 <div className="absolute bottom-6 right-6 z-50">
-                    <CreateDeckDialog open={createDialog.open} onOpenChange={(val) => setCreateDialog(prev => ({ ...prev, open: val }))} parentId={null} type={createDialog.type} onCreated={fetchAllData} trigger={<Button onClick={() => openCreateFile(null)} className="h-14 w-14 rounded-full shadow-xl bg-zinc-900 hover:bg-zinc-800 text-white flex items-center justify-center transition-transform hover:scale-105 active:scale-95"><Plus className="h-6 w-6" /></Button>}/>
+                    <Button 
+                        onClick={() => openCreateFile(null)} 
+                        className="h-14 w-14 rounded-full shadow-xl bg-zinc-900 hover:bg-zinc-800 text-white flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
+                    >
+                        <Plus className="h-6 w-6" />
+                    </Button>
                 </div>
             </div>
         </main>

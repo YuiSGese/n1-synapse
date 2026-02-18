@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, Folder, FileText, FolderPlus, FilePlus, Trash2, PlayCircle, CheckCircle2, MoreHorizontal, Pencil } from 'lucide-react'
+import { ChevronRight, ChevronDown, Folder, FileText, FolderPlus, FilePlus, Trash2, PlayCircle, CheckCircle2, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   ContextMenu,
@@ -27,32 +27,60 @@ interface FolderTreeProps {
   onCreateFile: (parentId: string) => void
   onDelete: (id: string, type: string) => void
   onNavigate: (id: string) => void
-  onRename: (id: string, name: string, type: string) => void // <--- Callback mới
+  onRename: (id: string, name: string, type: string) => void
+  onMove: (dragId: string, targetFolderId: string) => void // <--- Callback mới cho hành động di chuyển
 }
 
-function TreeItem({ node, onDragStart, onCreateFolder, onCreateFile, onDelete, onNavigate, onRename }: { 
+function TreeItem({ node, onDragStart, onCreateFolder, onCreateFile, onDelete, onNavigate, onRename, onMove }: { 
   node: TreeNode, 
   onDragStart: any,
   onCreateFolder: (id: string) => void,
   onCreateFile: (id: string) => void,
   onDelete: (id: string, type: string) => void,
   onNavigate: (id: string) => void,
-  onRename: (id: string, name: string, type: string) => void
+  onRename: (id: string, name: string, type: string) => void,
+  onMove: (dragId: string, targetId: string) => void
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false) // State để highlight khi kéo vào
   
   const isFolder = node.type === 'folder'
   const hasChildren = node.children && node.children.length > 0
 
   const handleDragStart = (e: React.DragEvent) => {
-    if (!isFolder) {
-      onDragStart(e, node)
-    } else {
-      e.preventDefault()
+    // Cho phép kéo cả Folder và File (để sắp xếp lại)
+    onDragStart(e, node)
+  }
+
+  // --- LOGIC DROP ZONE (Chỉ cho Folder) ---
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!isFolder) return
+    e.preventDefault() // Bắt buộc để cho phép drop
+    e.stopPropagation()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!isFolder) return
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    if (!isFolder) return
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+    
+    const dragId = e.dataTransfer.getData("deckId")
+    if (dragId && dragId !== node.id) {
+      // Gọi hàm di chuyển: dragId chui vào node.id
+      onMove(dragId, node.id)
     }
   }
 
-  // Nút hành động nhanh (cho Desktop Hover)
+  // Nút hành động nhanh
   const ActionButton = ({ icon: Icon, onClick, title, className }: any) => (
     <button 
       onClick={(e) => {
@@ -87,12 +115,18 @@ function TreeItem({ node, onDragStart, onCreateFolder, onCreateFile, onDelete, o
         <ContextMenuTrigger>
           <div 
             className={cn(
-              "flex items-center gap-1.5 py-1.5 px-2 rounded-md transition-colors cursor-pointer group pr-2 ml-4", // ml-4 để thụt đầu dòng
-              isFolder ? "hover:bg-zinc-100 text-zinc-700" : "hover:bg-blue-50 text-zinc-600 hover:text-blue-700"
+              "flex items-center gap-1.5 py-1.5 px-2 rounded-md transition-colors cursor-pointer group pr-2 ml-4 border border-transparent",
+              // Style bình thường
+              isFolder ? "hover:bg-zinc-100 text-zinc-700" : "hover:bg-blue-50 text-zinc-600 hover:text-blue-700",
+              // Style khi có ai đó đang kéo vào (Highlight Droppable)
+              isDragOver && "bg-blue-100 border-blue-300 ring-2 ring-blue-200 z-10 relative"
             )}
             onClick={handleClick}
-            draggable={!isFolder}
+            draggable
             onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
           >
             <span className="w-4 h-4 flex items-center justify-center shrink-0">
               {isFolder && (
@@ -113,7 +147,7 @@ function TreeItem({ node, onDragStart, onCreateFolder, onCreateFile, onDelete, o
               <StatusIcon />
             </span>
             
-            {/* Desktop Actions (Hover) - Vẫn giữ lại cho tiện trên PC */}
+            {/* Desktop Actions */}
             <div className="flex items-center gap-0.5 hidden md:flex">
               {isFolder && (
                 <>
@@ -121,19 +155,13 @@ function TreeItem({ node, onDragStart, onCreateFolder, onCreateFile, onDelete, o
                   <ActionButton icon={FolderPlus} onClick={() => onCreateFolder(node.id)} title="Tạo thư mục con" />
                 </>
               )}
-              {/* Thêm nút Rename vào hover desktop luôn */}
               <ActionButton icon={Pencil} onClick={() => onRename(node.id, node.name, node.type)} title="Đổi tên" />
               <ActionButton icon={Trash2} onClick={() => onDelete(node.id, node.type)} title="Xóa" className="hover:text-red-600 hover:bg-red-50" />
-            </div>
-
-            {/* Mobile Visual Cue (Dấu 3 chấm để biết có menu) */}
-            <div className="md:hidden text-zinc-300">
-               <MoreHorizontal className="h-4 w-4" />
             </div>
           </div>
         </ContextMenuTrigger>
 
-        {/* MENU NGỮ CẢNH (Right Click / Long Press) */}
+        {/* MENU NGỮ CẢNH (Mobile Long Press) */}
         <ContextMenuContent className="w-48">
           <ContextMenuLabel>{isFolder ? 'Thư mục' : 'Bài học'}: {node.name}</ContextMenuLabel>
           <ContextMenuSeparator />
@@ -160,7 +188,6 @@ function TreeItem({ node, onDragStart, onCreateFolder, onCreateFile, onDelete, o
         </ContextMenuContent>
       </ContextMenu>
 
-      {/* Render con đệ quy */}
       {isFolder && isOpen && hasChildren && (
         <div className="border-l border-zinc-200 ml-3">
           {node.children!.map(child => (
@@ -172,7 +199,8 @@ function TreeItem({ node, onDragStart, onCreateFolder, onCreateFile, onDelete, o
               onCreateFile={onCreateFile}
               onDelete={onDelete}
               onNavigate={onNavigate}
-              onRename={onRename} // Truyền xuống
+              onRename={onRename}
+              onMove={onMove}
             />
           ))}
         </div>
@@ -181,7 +209,7 @@ function TreeItem({ node, onDragStart, onCreateFolder, onCreateFile, onDelete, o
   )
 }
 
-export function FolderTree({ data, onDragStart, onCreateFolder, onCreateFile, onDelete, onNavigate, onRename }: FolderTreeProps) {
+export function FolderTree({ data, onDragStart, onCreateFolder, onCreateFile, onDelete, onNavigate, onRename, onMove }: FolderTreeProps) {
   if (!data || data.length === 0) {
     return <div className="text-zinc-400 text-xs p-4 italic text-center">Chưa có dữ liệu</div>
   }
@@ -198,6 +226,7 @@ export function FolderTree({ data, onDragStart, onCreateFolder, onCreateFile, on
           onDelete={onDelete}
           onNavigate={onNavigate}
           onRename={onRename}
+          onMove={onMove}
         />
       ))}
     </div>
