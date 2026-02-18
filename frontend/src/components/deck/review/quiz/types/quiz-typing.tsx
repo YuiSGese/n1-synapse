@@ -28,11 +28,10 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
   const [countdown, setCountdown] = useState(5)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Tự động focus mỗi khi chuyển từ vựng
   useEffect(() => {
-    // Tự động focus nhẹ nhàng
     const timer = setTimeout(() => {
-        // Kiểm tra nếu đang trên mobile thì có thể cân nhắc không auto-focus quá gắt để tránh nhảy màn hình
-        // Nhưng game typing thì nên focus.
+        // Luôn focus vào input để sẵn sàng gõ
         inputRef.current?.focus()
     }, 100)
     
@@ -55,6 +54,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
             setShowAnswer(false)
             setStatus('idle')
             setInput('')
+            // Focus lại ngay khi hết giờ phạt
             setTimeout(() => inputRef.current?.focus(), 100)
             return 0
           }
@@ -93,16 +93,19 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
   }
 
   return (
-    // SỬA: justify-start và h-full nhưng có overflow để cuộn nếu cần thiết
-    // Bỏ mt-8, pt-4 để tiết kiệm diện tích tối đa phía trên
-    <div className="flex flex-col items-center justify-start h-full w-full max-w-md mx-auto p-4 overflow-y-auto no-scrollbar">
+    // LAYOUT TỐI ƯU CHO MOBILE TYPING
+    // Sử dụng Flex column với Spacer để căn chỉnh linh hoạt
+    <div className="flex flex-col h-full w-full max-w-md mx-auto p-4 overflow-y-auto no-scrollbar">
       
-      {/* Wrapper canh giữa nội dung theo chiều dọc (khi đủ chỗ) */}
-      <div className="w-full my-auto flex flex-col gap-4">
+      {/* Spacer trên: Đẩy nội dung xuống khi có nhiều chỗ */}
+      <div className="flex-1" />
+
+      {/* KHỐI NỘI DUNG CHÍNH */}
+      <div className="w-full flex flex-col gap-6 shrink-0 transition-all duration-300">
         
-        {/* CÂU HỎI - Tối ưu diện tích */}
-        <div className="w-full bg-white border-2 border-zinc-100 rounded-3xl p-6 shadow-sm flex flex-col items-center justify-center relative overflow-hidden shrink-0">
-          {/* Giảm size chữ trên mobile từ 5xl xuống 4xl để gọn hơn */}
+        {/* CÂU HỎI */}
+        <div className="w-full bg-white border-2 border-zinc-100 rounded-3xl p-6 shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
+          {/* Kanji */}
           <h2 className="text-4xl md:text-7xl font-black text-zinc-900 text-center break-words leading-tight">
             {vocab.word}
           </h2>
@@ -113,7 +116,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
         </div>
 
         {/* FORM NHẬP LIỆU */}
-        <form onSubmit={handleSubmit} className="w-full space-y-4 shrink-0">
+        <form onSubmit={handleSubmit} className="w-full space-y-4">
           <div className="relative group">
               <Input
                   ref={inputRef}
@@ -141,6 +144,8 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
                       type="submit"
                       size="icon"
                       disabled={status === 'correct' || showAnswer || !input.trim()}
+                      // QUAN TRỌNG: Ngăn chặn mất focus khi click nút
+                      onMouseDown={(e) => e.preventDefault()}
                       className={cn(
                           "h-full w-10 rounded-xl transition-all shadow-none",
                           status === 'correct' ? "bg-green-500 hover:bg-green-600 text-white" :
@@ -153,7 +158,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
               </div>
           </div>
 
-          {/* HIỂN THỊ ĐÁP ÁN KHI SAI (Compact) */}
+          {/* HIỂN THỊ ĐÁP ÁN KHI SAI */}
           <div className={cn(
               "text-center transition-all duration-300 overflow-hidden",
               showAnswer ? "h-auto opacity-100" : "h-0 opacity-0"
@@ -166,6 +171,8 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
         </form>
       </div>
       
+      {/* Spacer dưới: Đẩy nội dung lên khi bàn phím chiếm chỗ (Spacer này sẽ bị thu nhỏ đầu tiên) */}
+      <div className="flex-[2]" /> 
     </div>
   )
 }

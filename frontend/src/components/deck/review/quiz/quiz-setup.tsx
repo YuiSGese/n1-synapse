@@ -3,7 +3,6 @@
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ArrowLeft, BookA, Keyboard, MousePointerClick, Shuffle, Type } from 'lucide-react'
-import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
 export type QuizMode = 'meaning' | 'reading' | 'matching' | 'typing' | 'mixed'
@@ -14,8 +13,6 @@ interface QuizSetupProps {
 }
 
 export function QuizSetup({ onStart, onBack }: QuizSetupProps) {
-  const [selected, setSelected] = useState<QuizMode | null>(null)
-
   const modes = [
     {
       id: 'meaning',
@@ -71,42 +68,30 @@ export function QuizSetup({ onStart, onBack }: QuizSetupProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {modes.map((mode) => {
           const Icon = mode.icon
           return (
             <Card 
               key={mode.id}
               className={cn(
-                "p-6 cursor-pointer border-2 transition-all duration-200 hover:shadow-md relative overflow-hidden group",
-                selected === mode.id ? `border-zinc-900 ring-1 ring-zinc-900 bg-zinc-50` : `border-zinc-100 ${mode.border}`
+                "p-6 cursor-pointer border-2 transition-all duration-200 hover:shadow-md hover:scale-[1.01] active:scale-[0.99] relative overflow-hidden group",
+                `border-zinc-100 ${mode.border}`
               )}
-              onClick={() => setSelected(mode.id as QuizMode)}
+              onClick={() => onStart(mode.id as QuizMode)}
             >
-              <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110", mode.color)}>
-                <Icon className="w-6 h-6" />
+              {/* Header: Icon + Title nằm ngang */}
+              <div className="flex items-center gap-4 mb-3">
+                <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110", mode.color)}>
+                  <Icon className="w-6 h-6" />
+                </div>
+                <h3 className="font-bold text-zinc-800 text-lg">{mode.title}</h3>
               </div>
-              <h3 className="font-bold text-zinc-800 mb-2">{mode.title}</h3>
+
               <p className="text-sm text-zinc-500 leading-relaxed">{mode.desc}</p>
-              
-              {selected === mode.id && (
-                <div className="absolute top-4 right-4 w-3 h-3 bg-zinc-900 rounded-full animate-pulse" />
-              )}
             </Card>
           )
         })}
-      </div>
-
-      {/* Footer Fixed Button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-zinc-200 flex justify-center md:absolute md:rounded-b-3xl">
-        <Button 
-          size="lg" 
-          disabled={!selected} 
-          onClick={() => selected && onStart(selected)}
-          className="w-full max-w-md bg-zinc-900 text-white hover:bg-zinc-800 shadow-lg text-lg h-12 rounded-xl"
-        >
-          Bắt đầu ngay
-        </Button>
       </div>
     </div>
   )
