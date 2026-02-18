@@ -26,25 +26,30 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
   const [hasFailed, setHasFailed] = useState(false)
   const [showAnswer, setShowAnswer] = useState(false)
   const [countdown, setCountdown] = useState(5)
+
   const inputRef = useRef<HTMLInputElement>(null)
+  const sessionStarted = useRef(false)
 
-  const correctReading = vocab.reading ? vocab.reading.split('(')[0].trim() : ''
+  const correctReading = vocab.reading
+    ? vocab.reading.split('(')[0].trim()
+    : ''
 
-  // Auto focus khi đổi từ
+  // Chỉ focus 1 lần duy nhất khi bắt đầu session
   useEffect(() => {
-    const timer = setTimeout(() => {
-      inputRef.current?.focus()
-    }, 100)
+    if (!sessionStarted.current) {
+      sessionStarted.current = true
+      setTimeout(() => inputRef.current?.focus(), 150)
+    }
+  }, [])
 
+  // Reset state khi sang từ mới – KHÔNG ĐỤNG focus
+  useEffect(() => {
     setInput('')
     setStatus('idle')
-    setHasFailed(false)
     setShowAnswer(false)
-
-    return () => clearTimeout(timer)
   }, [vocab])
 
-  // Auto submit khi gõ đủ & đúng
+  // Auto submit khi gõ đúng
   useEffect(() => {
     if (
       input &&
@@ -56,7 +61,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
     }
   }, [input])
 
-  // Countdown khi sai + phát âm đáp án
+  // Countdown khi sai + phát âm
   useEffect(() => {
     let timer: NodeJS.Timeout
 
@@ -71,7 +76,6 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
             setShowAnswer(false)
             setStatus('idle')
             setInput('')
-            setTimeout(() => inputRef.current?.focus(), 100)
             return 0
           }
           return prev - 1
@@ -87,14 +91,13 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
 
     if (status === 'correct' || showAnswer || !input.trim()) return
 
-    const userInput = input.trim()
-
-    if (userInput === correctReading) {
+    if (input.trim() === correctReading) {
       setStatus('correct')
       speakText(vocab.word)
+
       setTimeout(() => {
         onResult(!hasFailed)
-      }, 900)
+      }, 700)
     } else {
       setStatus('wrong')
       setHasFailed(true)
@@ -109,23 +112,30 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
   }
 
   return (
-    <div className="flex flex-col h-full w-full max-w-md mx-auto p-4 overflow-y-auto no-scrollbar">
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-zinc-50">
       
-      <div className="flex-1" />
-
-      <div className="w-full flex flex-col gap-6 shrink-0 transition-all duration-300">
-        
-        <div className="w-full bg-white border-2 border-zinc-100 rounded-3xl p-6 shadow-sm flex flex-col items-center justify-center">
-          <h2 className="text-4xl md:text-7xl font-black text-zinc-900 text-center leading-tight">
+      {/* HEADER FIXED */}
+      <div className="shrink-0 p-4 border-b bg-white">
+        <div className="w-full max-w-md mx-auto flex flex-col items-center justify-center">
+          <h2 className="text-4xl md:text-6xl font-black text-zinc-900 text-center leading-tight">
             {vocab.word}
           </h2>
           <p className="text-zinc-400 mt-2 font-medium text-xs text-center line-clamp-2">
             {vocab.meaning}
           </p>
         </div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="w-full space-y-4">
-          <div className="relative group">
+      {/* SPACER */}
+      <div className="flex-1 overflow-y-auto" />
+
+      {/* INPUT FIXED BOTTOM */}
+      <div className="shrink-0 p-4 border-t bg-white">
+        <form
+          onSubmit={handleSubmit}
+          className="w-full max-w-md mx-auto"
+        >
+          <div className="relative">
             <Input
               ref={inputRef}
               value={input}
@@ -133,16 +143,18 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
                 setInput(e.target.value)
                 if (status === 'wrong') setStatus('idle')
               }}
-              disabled={status === 'correct' || showAnswer}
               placeholder="nhập hiragana"
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
               className={cn(
                 "h-14 pr-14 pl-6 text-center text-lg font-bold rounded-2xl border-2 transition-all duration-300 shadow-sm",
-                status === 'correct' && "border-green-500 bg-green-50 text-green-900",
-                status === 'wrong' && "border-red-500 bg-red-50 text-red-900 animate-shake",
-                status === 'idle' && "border-zinc-200 focus:border-zinc-900 focus:ring-4 focus:ring-zinc-100"
+                status === 'correct' &&
+                  "border-green-500 bg-green-50 text-green-900",
+                status === 'wrong' &&
+                  "border-red-500 bg-red-50 text-red-900 animate-shake",
+                status === 'idle' &&
+                  "border-zinc-200 focus:border-zinc-900 focus:ring-4 focus:ring-zinc-100"
               )}
             />
 
@@ -150,7 +162,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
               <Button
                 type="submit"
                 size="icon"
-                disabled={status === 'correct' || showAnswer || !input.trim()}
+                disabled={showAnswer || !input.trim()}
                 onMouseDown={(e) => e.preventDefault()}
                 className={cn(
                   "h-full w-10 rounded-xl transition-all shadow-none",
@@ -168,7 +180,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
 
           <div
             className={cn(
-              "text-center transition-all duration-300 overflow-hidden",
+              "text-center transition-all duration-300 overflow-hidden mt-3",
               showAnswer ? "h-auto opacity-100" : "h-0 opacity-0"
             )}
           >
@@ -183,8 +195,6 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
           </div>
         </form>
       </div>
-
-      <div className="flex-[2]" />
     </div>
   )
 }
