@@ -25,7 +25,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
   const [status, setStatus] = useState<'idle' | 'wrong' | 'correct'>('idle')
   const [hasFailed, setHasFailed] = useState(false)
   const [showAnswer, setShowAnswer] = useState(false)
-  const [countdown, setCountdown] = useState(5)
+  const [countdown, setCountdown] = useState(3)
 
   const inputRef = useRef<HTMLInputElement>(null)
   const sessionStarted = useRef(false)
@@ -34,15 +34,15 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
     ? vocab.reading.split('(')[0].trim()
     : ''
 
-  // Chỉ focus 1 lần duy nhất khi bắt đầu session
+  // Focus input 1 lần duy nhất khi bắt đầu session
   useEffect(() => {
     if (!sessionStarted.current) {
       sessionStarted.current = true
-      setTimeout(() => inputRef.current?.focus(), 150)
+      setTimeout(() => inputRef.current?.focus(), 120)
     }
   }, [])
 
-  // Reset state khi sang từ mới – KHÔNG ĐỤNG focus
+  // Reset state khi sang từ mới – KHÔNG focus lại
   useEffect(() => {
     setInput('')
     setStatus('idle')
@@ -67,7 +67,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
 
     if (showAnswer) {
       speakText(vocab.word)
-      setCountdown(5)
+      setCountdown(3)
 
       timer = setInterval(() => {
         setCountdown((prev) => {
@@ -112,30 +112,27 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
   }
 
   return (
-    <div className="h-[100dvh] flex flex-col overflow-hidden bg-zinc-50">
+    <div className="flex flex-col h-full w-full max-w-md mx-auto p-4 overflow-y-auto no-scrollbar">
       
-      {/* HEADER FIXED */}
-      <div className="shrink-0 p-4 border-b bg-white">
-        <div className="w-full max-w-md mx-auto flex flex-col items-center justify-center">
-          <h2 className="text-4xl md:text-6xl font-black text-zinc-900 text-center leading-tight">
+      {/* Spacer trên */}
+      <div className="flex-1" />
+
+      {/* KHỐI NỘI DUNG CHÍNH */}
+      <div className="w-full flex flex-col gap-6 shrink-0 transition-all duration-300">
+        
+        {/* CÂU HỎI */}
+        <div className="w-full bg-white border-2 border-zinc-100 rounded-3xl p-6 shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
+          <h2 className="text-4xl md:text-7xl font-black text-zinc-900 text-center break-words leading-tight">
             {vocab.word}
           </h2>
           <p className="text-zinc-400 mt-2 font-medium text-xs text-center line-clamp-2">
             {vocab.meaning}
           </p>
         </div>
-      </div>
 
-      {/* SPACER */}
-      <div className="flex-1 overflow-y-auto" />
-
-      {/* INPUT FIXED BOTTOM */}
-      <div className="shrink-0 p-4 border-t bg-white">
-        <form
-          onSubmit={handleSubmit}
-          className="w-full max-w-md mx-auto"
-        >
-          <div className="relative">
+        {/* FORM NHẬP LIỆU */}
+        <form onSubmit={handleSubmit} className="w-full space-y-4">
+          <div className="relative group">
             <Input
               ref={inputRef}
               value={input}
@@ -147,14 +144,16 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
+              readOnly={showAnswer}
               className={cn(
-                "h-14 pr-14 pl-6 text-center text-lg font-bold rounded-2xl border-2 transition-all duration-300 shadow-sm",
+                "h-14 pr-14 pl-6 text-center text-lg font-bold rounded-2xl border-2 transition-all duration-300 shadow-sm placeholder:font-normal placeholder:text-zinc-300",
                 status === 'correct' &&
                   "border-green-500 bg-green-50 text-green-900",
                 status === 'wrong' &&
                   "border-red-500 bg-red-50 text-red-900 animate-shake",
                 status === 'idle' &&
-                  "border-zinc-200 focus:border-zinc-900 focus:ring-4 focus:ring-zinc-100"
+                  "border-zinc-200 focus:border-zinc-900 focus:ring-4 focus:ring-zinc-100",
+                showAnswer && "pointer-events-none"
               )}
             />
 
@@ -178,9 +177,10 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
             </div>
           </div>
 
+          {/* ĐÁP ÁN */}
           <div
             className={cn(
-              "text-center transition-all duration-300 overflow-hidden mt-3",
+              "text-center transition-all duration-300 overflow-hidden",
               showAnswer ? "h-auto opacity-100" : "h-0 opacity-0"
             )}
           >
@@ -195,6 +195,9 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
           </div>
         </form>
       </div>
+
+      {/* Spacer dưới */}
+      <div className="flex-[2]" />
     </div>
   )
 }
