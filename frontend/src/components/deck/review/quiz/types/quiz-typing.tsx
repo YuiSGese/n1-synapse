@@ -28,30 +28,28 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
   const [countdown, setCountdown] = useState(3)
 
   const inputRef = useRef<HTMLInputElement>(null)
-  
-  // Dùng ref để track việc mount, tránh focus lung tung
-  const isMounted = useRef(false)
+  const sessionStarted = useRef(false)
 
   const correctReading = vocab.reading
     ? vocab.reading.split('(')[0].trim()
     : ''
 
-  // 1. Tự động Focus và giữ bàn phím
+  // Focus input 1 lần duy nhất khi bắt đầu session
   useEffect(() => {
-    // Timeout nhỏ để đảm bảo UI render xong mới focus
-    const timer = setTimeout(() => {
-        inputRef.current?.focus()
-    }, 50)
-    
-    // Reset state
+    if (!sessionStarted.current) {
+      sessionStarted.current = true
+      setTimeout(() => inputRef.current?.focus(), 120)
+    }
+  }, [])
+
+  // Reset state khi sang từ mới – KHÔNG focus lại
+  useEffect(() => {
     setInput('')
     setStatus('idle')
     setShowAnswer(false)
-    
-    return () => clearTimeout(timer)
   }, [vocab])
 
-  // 2. Auto submit khi gõ đúng
+  // Auto submit khi gõ đúng
   useEffect(() => {
     if (
       input &&
@@ -63,7 +61,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
     }
   }, [input])
 
-  // 3. Countdown khi sai
+  // Countdown khi sai + phát âm
   useEffect(() => {
     let timer: NodeJS.Timeout
 
@@ -78,8 +76,6 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
             setShowAnswer(false)
             setStatus('idle')
             setInput('')
-            // Focus lại ngay để bàn phím không tắt
-            setTimeout(() => inputRef.current?.focus(), 50)
             return 0
           }
           return prev - 1
@@ -116,17 +112,19 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
   }
 
   return (
-    // SỬA LAYOUT: h-full flex-col
     <div className="flex flex-col h-full w-full max-w-md mx-auto p-4 overflow-y-auto no-scrollbar">
       
-      {/* SỬA LAYOUT 1: Bỏ Spacer lớn ở trên.
-        Dùng khoảng cách cố định (mt-4 hoặc mt-8) để nội dung luôn nằm ở phần trên màn hình.
-        Khi bàn phím bật lên, phần này vẫn nằm trong tầm mắt.
+      {/* SỬA ĐỔI QUAN TRỌNG: 
+        Thay vì dùng flex-1 (Spacer động) ở đây, ta dùng chiều cao cố định nhỏ.
+        Mục đích: Neo nội dung lên phía trên màn hình ngay từ đầu.
+        Khi bàn phím hiện lên, Input đã ở vị trí an toàn, trình duyệt sẽ KHÔNG cần cuộn trang lên,
+        giữ cho Header và Tabs bên trên không bị che khuất.
       */}
-      <div className="h-4 md:h-12 shrink-0 transition-all" />
+      <div className="h-2 md:h-12 shrink-0 transition-all" />
 
       {/* KHỐI NỘI DUNG CHÍNH */}
-      <div className="w-full flex flex-col gap-6 shrink-0 transition-all duration-300">
+      {/* Giảm gap từ 6 xuống 4 để tiết kiệm diện tích dọc trên mobile */}
+      <div className="w-full flex flex-col gap-4 md:gap-6 shrink-0 transition-all duration-300">
         
         {/* CÂU HỎI */}
         <div className="w-full bg-white border-2 border-zinc-100 rounded-3xl p-6 shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
@@ -152,9 +150,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
-              // SỬA QUAN TRỌNG 2: Tuyệt đối KHÔNG dùng disabled={true} khi đúng
-              // Thay vào đó dùng readOnly. Disabled sẽ làm mất bàn phím ngay lập tức.
-              readOnly={status === 'correct' || showAnswer} 
+              readOnly={status === 'correct' || showAnswer}
               className={cn(
                 "h-14 pr-14 pl-6 text-center text-lg font-bold rounded-2xl border-2 transition-all duration-300 shadow-sm placeholder:font-normal placeholder:text-zinc-300",
                 status === 'correct' &&
@@ -163,7 +159,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
                   "border-red-500 bg-red-50 text-red-900 animate-shake",
                 status === 'idle' &&
                   "border-zinc-200 focus:border-zinc-900 focus:ring-4 focus:ring-zinc-100",
-                showAnswer && "opacity-80" // Chỉ làm mờ nhẹ thay vì disable hoàn toàn
+                showAnswer && "opacity-80"
               )}
             />
 
@@ -171,7 +167,6 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
               <Button
                 type="submit"
                 size="icon"
-                // Vẫn chặn click khi đang show answer
                 disabled={showAnswer || !input.trim()}
                 onMouseDown={(e) => e.preventDefault()}
                 className={cn(
@@ -208,10 +203,10 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
       </div>
 
       {/* Spacer dưới: Chiếm toàn bộ khoảng trống còn lại. 
-         Khi bàn phím hiện lên, spacer này sẽ bị thu nhỏ lại đầu tiên, 
-         giữ cho phần nội dung chính (Card + Input) nằm yên ở trên.
+          Khi bàn phím hiện lên, khoảng trống này sẽ bị che lấp, 
+          nhưng nội dung chính bên trên vẫn giữ nguyên vị trí.
       */}
-      <div className="flex-1" />
+      <div className="flex-1 min-h-[20px]" />
     </div>
   )
 }
