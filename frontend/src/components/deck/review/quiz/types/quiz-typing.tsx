@@ -28,28 +28,32 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
   const [countdown, setCountdown] = useState(3)
 
   const inputRef = useRef<HTMLInputElement>(null)
+  // Ref để kiểm soát việc focus lần đầu
   const sessionStarted = useRef(false)
 
   const correctReading = vocab.reading
     ? vocab.reading.split('(')[0].trim()
     : ''
 
-  // Focus input 1 lần duy nhất khi bắt đầu session
+  // 1. Focus input 1 lần duy nhất khi component được mount
   useEffect(() => {
     if (!sessionStarted.current) {
       sessionStarted.current = true
-      setTimeout(() => inputRef.current?.focus(), 120)
+      // Timeout nhẹ để đảm bảo UI render xong
+      setTimeout(() => inputRef.current?.focus(), 150)
     }
   }, [])
 
-  // Reset state khi sang từ mới – KHÔNG focus lại
+  // 2. Reset state khi sang từ mới – KHÔNG gọi focus() lại để tránh mất bàn phím
   useEffect(() => {
     setInput('')
     setStatus('idle')
     setShowAnswer(false)
+    // Lưu ý: Không focus lại ở đây. 
+    // Vì ta dùng onMouseDown.preventDefault() ở nút bấm, nên focus vẫn nằm ở Input.
   }, [vocab])
 
-  // Auto submit khi gõ đúng
+  // 3. Auto submit khi gõ đúng
   useEffect(() => {
     if (
       input &&
@@ -61,7 +65,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
     }
   }, [input])
 
-  // Countdown khi sai + phát âm
+  // 4. Countdown khi sai
   useEffect(() => {
     let timer: NodeJS.Timeout
 
@@ -114,16 +118,10 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
   return (
     <div className="flex flex-col h-full w-full max-w-md mx-auto p-4 overflow-y-auto no-scrollbar">
       
-      {/* SỬA ĐỔI QUAN TRỌNG: 
-        Thay vì dùng flex-1 (Spacer động) ở đây, ta dùng chiều cao cố định nhỏ.
-        Mục đích: Neo nội dung lên phía trên màn hình ngay từ đầu.
-        Khi bàn phím hiện lên, Input đã ở vị trí an toàn, trình duyệt sẽ KHÔNG cần cuộn trang lên,
-        giữ cho Header và Tabs bên trên không bị che khuất.
-      */}
+      {/* Spacer trên cố định để giữ layout top-heavy */}
       <div className="h-2 md:h-12 shrink-0 transition-all" />
 
       {/* KHỐI NỘI DUNG CHÍNH */}
-      {/* Giảm gap từ 6 xuống 4 để tiết kiệm diện tích dọc trên mobile */}
       <div className="w-full flex flex-col gap-4 md:gap-6 shrink-0 transition-all duration-300">
         
         {/* CÂU HỎI */}
@@ -168,6 +166,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
                 type="submit"
                 size="icon"
                 disabled={showAnswer || !input.trim()}
+                // QUAN TRỌNG: Giữ focus khi bấm nút
                 onMouseDown={(e) => e.preventDefault()}
                 className={cn(
                   "h-full w-10 rounded-xl transition-all shadow-none",
@@ -202,10 +201,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
         </form>
       </div>
 
-      {/* Spacer dưới: Chiếm toàn bộ khoảng trống còn lại. 
-          Khi bàn phím hiện lên, khoảng trống này sẽ bị che lấp, 
-          nhưng nội dung chính bên trên vẫn giữ nguyên vị trí.
-      */}
+      {/* Spacer dưới */}
       <div className="flex-1 min-h-[20px]" />
     </div>
   )
