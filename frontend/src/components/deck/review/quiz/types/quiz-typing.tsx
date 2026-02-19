@@ -28,28 +28,30 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
   const [countdown, setCountdown] = useState(3)
 
   const inputRef = useRef<HTMLInputElement>(null)
-  const sessionStarted = useRef(false)
+  
+  // Dùng ref để track việc mount, tránh focus lung tung
+  const isMounted = useRef(false)
 
   const correctReading = vocab.reading
     ? vocab.reading.split('(')[0].trim()
     : ''
 
-  // Focus input 1 lần duy nhất khi bắt đầu session
+  // 1. Tự động Focus và giữ bàn phím
   useEffect(() => {
-    if (!sessionStarted.current) {
-      sessionStarted.current = true
-      setTimeout(() => inputRef.current?.focus(), 120)
-    }
-  }, [])
-
-  // Reset state khi sang từ mới – KHÔNG focus lại
-  useEffect(() => {
+    // Timeout nhỏ để đảm bảo UI render xong mới focus
+    const timer = setTimeout(() => {
+        inputRef.current?.focus()
+    }, 50)
+    
+    // Reset state
     setInput('')
     setStatus('idle')
     setShowAnswer(false)
+    
+    return () => clearTimeout(timer)
   }, [vocab])
 
-  // Auto submit khi gõ đúng
+  // 2. Auto submit khi gõ đúng
   useEffect(() => {
     if (
       input &&
@@ -61,7 +63,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
     }
   }, [input])
 
-  // Countdown khi sai + phát âm
+  // 3. Countdown khi sai
   useEffect(() => {
     let timer: NodeJS.Timeout
 
@@ -76,6 +78,8 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
             setShowAnswer(false)
             setStatus('idle')
             setInput('')
+            // Focus lại ngay để bàn phím không tắt
+            setTimeout(() => inputRef.current?.focus(), 50)
             return 0
           }
           return prev - 1
@@ -112,10 +116,14 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
   }
 
   return (
+    // SỬA LAYOUT: h-full flex-col
     <div className="flex flex-col h-full w-full max-w-md mx-auto p-4 overflow-y-auto no-scrollbar">
       
-      {/* Spacer trên */}
-      <div className="flex-1" />
+      {/* SỬA LAYOUT 1: Bỏ Spacer lớn ở trên.
+        Dùng khoảng cách cố định (mt-4 hoặc mt-8) để nội dung luôn nằm ở phần trên màn hình.
+        Khi bàn phím bật lên, phần này vẫn nằm trong tầm mắt.
+      */}
+      <div className="h-4 md:h-12 shrink-0 transition-all" />
 
       {/* KHỐI NỘI DUNG CHÍNH */}
       <div className="w-full flex flex-col gap-6 shrink-0 transition-all duration-300">
@@ -144,7 +152,9 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
-              readOnly={showAnswer}
+              // SỬA QUAN TRỌNG 2: Tuyệt đối KHÔNG dùng disabled={true} khi đúng
+              // Thay vào đó dùng readOnly. Disabled sẽ làm mất bàn phím ngay lập tức.
+              readOnly={status === 'correct' || showAnswer} 
               className={cn(
                 "h-14 pr-14 pl-6 text-center text-lg font-bold rounded-2xl border-2 transition-all duration-300 shadow-sm placeholder:font-normal placeholder:text-zinc-300",
                 status === 'correct' &&
@@ -153,7 +163,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
                   "border-red-500 bg-red-50 text-red-900 animate-shake",
                 status === 'idle' &&
                   "border-zinc-200 focus:border-zinc-900 focus:ring-4 focus:ring-zinc-100",
-                showAnswer && "pointer-events-none"
+                showAnswer && "opacity-80" // Chỉ làm mờ nhẹ thay vì disable hoàn toàn
               )}
             />
 
@@ -161,6 +171,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
               <Button
                 type="submit"
                 size="icon"
+                // Vẫn chặn click khi đang show answer
                 disabled={showAnswer || !input.trim()}
                 onMouseDown={(e) => e.preventDefault()}
                 className={cn(
@@ -196,8 +207,11 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
         </form>
       </div>
 
-      {/* Spacer dưới */}
-      <div className="flex-[2]" />
+      {/* Spacer dưới: Chiếm toàn bộ khoảng trống còn lại. 
+         Khi bàn phím hiện lên, spacer này sẽ bị thu nhỏ lại đầu tiên, 
+         giữ cho phần nội dung chính (Card + Input) nằm yên ở trên.
+      */}
+      <div className="flex-1" />
     </div>
   )
 }
