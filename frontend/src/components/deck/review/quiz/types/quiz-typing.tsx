@@ -28,28 +28,32 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
   const [countdown, setCountdown] = useState(3)
 
   const inputRef = useRef<HTMLInputElement>(null)
+  // Ref để kiểm soát việc focus lần đầu
   const sessionStarted = useRef(false)
 
   const correctReading = vocab.reading
     ? vocab.reading.split('(')[0].trim()
     : ''
 
-  // Focus input 1 lần duy nhất khi bắt đầu session
+  // 1. Focus input 1 lần duy nhất khi component được mount
   useEffect(() => {
     if (!sessionStarted.current) {
       sessionStarted.current = true
-      setTimeout(() => inputRef.current?.focus(), 120)
+      // Timeout nhẹ để đảm bảo UI render xong
+      setTimeout(() => inputRef.current?.focus(), 150)
     }
   }, [])
 
-  // Reset state khi sang từ mới – KHÔNG focus lại
+  // 2. Reset state khi sang từ mới – KHÔNG gọi focus() lại để tránh mất bàn phím
   useEffect(() => {
     setInput('')
     setStatus('idle')
     setShowAnswer(false)
+    // Lưu ý: Không focus lại ở đây. 
+    // Vì ta dùng onMouseDown.preventDefault() ở nút bấm, nên focus vẫn nằm ở Input.
   }, [vocab])
 
-  // Auto submit khi gõ đúng
+  // 3. Auto submit khi gõ đúng
   useEffect(() => {
     if (
       input &&
@@ -61,7 +65,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
     }
   }, [input])
 
-  // Countdown khi sai + phát âm
+  // 4. Countdown khi sai
   useEffect(() => {
     let timer: NodeJS.Timeout
 
@@ -114,11 +118,11 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
   return (
     <div className="flex flex-col h-full w-full max-w-md mx-auto p-4 overflow-y-auto no-scrollbar">
       
-      {/* Spacer trên */}
-      <div className="flex-1" />
+      {/* Spacer trên cố định để giữ layout top-heavy */}
+      <div className="h-2 md:h-12 shrink-0 transition-all" />
 
       {/* KHỐI NỘI DUNG CHÍNH */}
-      <div className="w-full flex flex-col gap-6 shrink-0 transition-all duration-300">
+      <div className="w-full flex flex-col gap-4 md:gap-6 shrink-0 transition-all duration-300">
         
         {/* CÂU HỎI */}
         <div className="w-full bg-white border-2 border-zinc-100 rounded-3xl p-6 shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
@@ -137,14 +141,17 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
               ref={inputRef}
               value={input}
               onChange={(e) => {
+                if (status === 'correct' || showAnswer) return
+
                 setInput(e.target.value)
                 if (status === 'wrong') setStatus('idle')
               }}
+
               placeholder="nhập hiragana"
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
-              readOnly={showAnswer}
+              
               className={cn(
                 "h-14 pr-14 pl-6 text-center text-lg font-bold rounded-2xl border-2 transition-all duration-300 shadow-sm placeholder:font-normal placeholder:text-zinc-300",
                 status === 'correct' &&
@@ -153,7 +160,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
                   "border-red-500 bg-red-50 text-red-900 animate-shake",
                 status === 'idle' &&
                   "border-zinc-200 focus:border-zinc-900 focus:ring-4 focus:ring-zinc-100",
-                showAnswer && "pointer-events-none"
+                showAnswer && "opacity-80"
               )}
             />
 
@@ -162,6 +169,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
                 type="submit"
                 size="icon"
                 disabled={showAnswer || !input.trim()}
+                // QUAN TRỌNG: Giữ focus khi bấm nút
                 onMouseDown={(e) => e.preventDefault()}
                 className={cn(
                   "h-full w-10 rounded-xl transition-all shadow-none",
@@ -197,7 +205,7 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
       </div>
 
       {/* Spacer dưới */}
-      <div className="flex-[2]" />
+      <div className="flex-1 min-h-[20px]" />
     </div>
   )
 }
