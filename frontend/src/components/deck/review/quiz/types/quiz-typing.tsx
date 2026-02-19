@@ -26,54 +26,62 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
   const [hasFailed, setHasFailed] = useState(false)
   const [showAnswer, setShowAnswer] = useState(false)
   const [countdown, setCountdown] = useState(3)
-  // KEY CHANGE 1: dùng key để force re-mount Input khi đổi từ
-  const [inputKey, setInputKey] = useState(0)
+  
+  // THÊM MỚI: Theo dõi trạng thái của bộ gõ IME (đang gõ hay đã chốt chữ)
+  const [isComposing, setIsComposing] = useState(false)
 
   const inputRef = useRef<HTMLInputElement>(null)
-  // KEY CHANGE 2: track IME composition state
-  const isComposing = useRef(false)
+  const sessionStarted = useRef(false)
 
   const correctReading = vocab.reading
     ? vocab.reading.split('(')[0].trim()
     : ''
 
-  // Focus lần đầu
+  // 1. Focus input 1 lần duy nhất khi component được mount
   useEffect(() => {
-    setTimeout(() => inputRef.current?.focus(), 150)
+    if (!sessionStarted.current) {
+      sessionStarted.current = true
+      setTimeout(() => inputRef.current?.focus(), 150)
+    }
   }, [])
 
-  // Reset khi đổi từ — tăng key để force re-mount Input, reset IME hoàn toàn
+  // 2. Reset state khi sang từ mới
   useEffect(() => {
     setInput('')
     setStatus('idle')
     setShowAnswer(false)
-    setHasFailed(false)
-    isComposing.current = false
-    // Tăng key → Input bị unmount/remount → IME session mới hoàn toàn
-    setInputKey((k) => k + 1)
-    // Focus sau khi re-mount
-    setTimeout(() => inputRef.current?.focus(), 50)
+    setHasFailed(false) // Nên reset cả trạng thái fail cho từ mới
+    setIsComposing(false) // Reset trạng thái IME
+    
+    // Đánh thức lại con trỏ nhấp nháy trên iOS sau khi đã xóa sạch chữ cũ.
+    // Nếu bàn phím đang mở sẵn, thao tác này không làm giật màn hình mà giúp con trỏ (caret) không bị kẹt.
+    if (document.activeElement !== inputRef.current) {
+      inputRef.current?.focus()
+    }
   }, [vocab])
 
-  // Auto submit — CHỈ khi IME đã xác nhận xong (không trong composition)
+  // 3. Auto submit khi gõ đúng
   useEffect(() => {
     if (
       input &&
       status === 'idle' &&
       !showAnswer &&
-      !isComposing.current &&
-      input === correctReading
+      input === correctReading &&
+      !isComposing // QUAN TRỌNG: Chỉ auto-submit khi người dùng đã chốt chữ (không còn gạch chân dưới chữ)
     ) {
       handleSubmit()
     }
-  }, [input])
+    // Cần thêm isComposing và các dependency khác để theo dõi sát sao
+  }, [input, isComposing, status, showAnswer, correctReading])
 
-  // Countdown khi sai
+  // 4. Countdown khi sai
   useEffect(() => {
     let timer: NodeJS.Timeout
+
     if (showAnswer) {
       speakText(vocab.word)
       setCountdown(3)
+
       timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -81,22 +89,27 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
             setShowAnswer(false)
             setStatus('idle')
             setInput('')
+            // Focus lại sau khi hết thời gian đếm ngược
+            inputRef.current?.focus()
             return 0
           }
           return prev - 1
         })
       }, 1000)
     }
+
     return () => clearInterval(timer)
-  }, [showAnswer])
+  }, [showAnswer, vocab.word])
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault()
+
     if (status === 'correct' || showAnswer || !input.trim()) return
 
     if (input.trim() === correctReading) {
       setStatus('correct')
       speakText(vocab.word)
+
       setTimeout(() => {
         onResult(!hasFailed)
       }, 700)
@@ -130,7 +143,6 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
         <form onSubmit={handleSubmit} className="w-full space-y-4">
           <div className="relative group">
             <Input
-              key={inputKey}  // ← force re-mount mỗi khi đổi từ
               ref={inputRef}
               value={input}
               onChange={(e) => {
@@ -138,20 +150,15 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
                 setInput(e.target.value)
                 if (status === 'wrong') setStatus('idle')
               }}
-              // KEY CHANGE 3: track IME composition
-              onCompositionStart={() => { isComposing.current = true }}
-              onCompositionEnd={(e) => {
-                isComposing.current = false
-                // Trigger check sau khi IME xác nhận
-                const value = (e.target as HTMLInputElement).value
-                if (value === correctReading && status === 'idle' && !showAnswer) {
-                  handleSubmit()
-                }
-              }}
+              // THÊM MỚI: Bắt sự kiện bắt đầu và kết thúc gõ IME để chặn auto-submit sai thời điểm
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={() => setIsComposing(false)}
+
               placeholder="nhập hiragana"
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
+              
               className={cn(
                 "h-14 pr-14 pl-6 text-center text-lg font-bold rounded-2xl border-2 transition-all duration-300 shadow-sm placeholder:font-normal placeholder:text-zinc-300",
                 status === 'correct' && "border-green-500 bg-green-50 text-green-900",
@@ -166,12 +173,15 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
                 type="submit"
                 size="icon"
                 disabled={showAnswer || !input.trim()}
+                // QUAN TRỌNG: Giữ nguyên để tránh mất focus khi user cố tình bấm nút
                 onMouseDown={(e) => e.preventDefault()}
                 className={cn(
                   "h-full w-10 rounded-xl transition-all shadow-none",
-                  status === 'correct' ? "bg-green-500 hover:bg-green-600 text-white"
-                  : status === 'wrong' ? "bg-red-500 hover:bg-red-600 text-white"
-                  : "bg-zinc-900 text-white hover:bg-zinc-700"
+                  status === 'correct'
+                    ? "bg-green-500 hover:bg-green-600 text-white"
+                    : status === 'wrong'
+                    ? "bg-red-500 hover:bg-red-600 text-white"
+                    : "bg-zinc-900 text-white hover:bg-zinc-700"
                 )}
               >
                 <ActionIcon />
@@ -179,13 +189,19 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
             </div>
           </div>
 
-          <div className={cn(
-            "text-center transition-all duration-300 overflow-hidden",
-            showAnswer ? "h-auto opacity-100" : "h-0 opacity-0"
-          )}>
+          <div
+            className={cn(
+              "text-center transition-all duration-300 overflow-hidden",
+              showAnswer ? "h-auto opacity-100" : "h-0 opacity-0"
+            )}
+          >
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 rounded-lg border border-red-100">
-              <span className="text-[10px] text-red-400 uppercase font-bold">Đáp án:</span>
-              <span className="text-lg font-black text-red-600 tracking-wider">{vocab.reading}</span>
+              <span className="text-[10px] text-red-400 uppercase font-bold">
+                Đáp án:
+              </span>
+              <span className="text-lg font-black text-red-600 tracking-wider">
+                {vocab.reading}
+              </span>
             </div>
           </div>
         </form>
