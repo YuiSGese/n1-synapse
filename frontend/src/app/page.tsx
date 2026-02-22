@@ -18,7 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { CreateDeckDialog } from '@/components/dashboard/create-deck-dialog'
 import { RenameDialog } from '@/components/dashboard/rename-dialog'
 import { FolderTree, TreeNode } from '@/components/dashboard/folder-tree'
-import { ShareDeckDialog } from '@/components/deck/share-deck-dialog' // <--- IMPORT
+import { ShareDeckDialog } from '@/components/deck/share-deck-dialog' 
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
@@ -57,7 +57,6 @@ export default function Home() {
     type: string;
   }>({ open: false, id: null, name: '', type: 'deck' })
 
-  // TẠO STATE CHO POPUP SHARE TỪ SIDEBAR
   const [shareDialog, setShareDialog] = useState<{
     open: boolean;
     deck: any;
@@ -65,24 +64,14 @@ export default function Home() {
 
   const handleNavigate = (id: string) => router.push(`/decks/${id}`)
 
-  const calculateDeckProgress = useCallback((vocabs: any[]) => {
-    if (!vocabs || vocabs.length === 0) return 0
-    let totalScore = 0
-    vocabs.forEach(v => {
-      if (v.interval > 7) totalScore += 100
-      else if (v.interval > 3) totalScore += 80
-      else if (v.interval > 1) totalScore += 50
-      else if (v.interval > 0) totalScore += 20
-    })
-    return Math.round(totalScore / vocabs.length)
-  }, [])
-
+  // BƯỚC 2: CẬP NHẬT FETCH DATA (Ngắn gọn và tối ưu hơn rất nhiều)
   const fetchAllData = useCallback(async () => {
     setLoading(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      // View decks_with_progress giờ đã chứa sẵn total_cards và progress_percent cực chuẩn!
       const { data: decksData, error: decksError } = await supabase
         .from('decks_with_progress') 
         .select('*')
@@ -91,22 +80,13 @@ export default function Home() {
 
       if (decksError) throw decksError
       
-      const { data: vocabData, error: vocabError } = await supabase.from('vocab').select('deck_id, interval')
-      if (vocabError) throw vocabError
-      
-      const decksWithProgress = decksData.map((deck: any) => {
-        const deckVocabs = vocabData?.filter((v: any) => v.deck_id === deck.id) || []
-        const progress = calculateDeckProgress(deckVocabs)
-        return { ...deck, total_cards: deckVocabs.length, progress_percent: progress }
-      })
-      
-      setAllItems(decksWithProgress as Deck[])
+      setAllItems(decksData as Deck[])
     } catch (error) {
       console.error(error); toast.error("Lỗi tải dữ liệu")
     } finally { 
       setLoading(false) 
     }
-  }, [supabase, calculateDeckProgress])
+  }, [supabase])
 
   useEffect(() => {
     const checkUser = async () => {
@@ -133,7 +113,6 @@ export default function Home() {
     setRenameDialog({ open: true, id, name, type })
   }
 
-  // HÀM MỞ POPUP SHARE
   const handleOpenShare = (node: TreeNode) => {
     const fullDeckInfo = allItems.find(i => i.id === node.id)
     if (fullDeckInfo) {
@@ -193,16 +172,6 @@ export default function Home() {
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-zinc-50">
-        <div className="p-3 border-b border-zinc-200 bg-white">
-            <Button 
-                onClick={() => router.push('/explore')} 
-                variant="outline" 
-                className="w-full gap-2 text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100 shadow-sm transition-all"
-            >
-                <Globe className="h-4 w-4" />
-                Khám phá Cộng đồng
-            </Button>
-        </div>
         <div className="p-3 border-b border-zinc-200 flex justify-between items-center bg-white sticky top-0 z-10 group">
             <h2 className="font-bold text-xs text-zinc-500 uppercase tracking-wider flex items-center gap-2">
               <FolderOpen className="h-3.5 w-3.5" /> Kho dữ liệu
@@ -214,7 +183,16 @@ export default function Home() {
             </div>
         </div>
 
-        
+        <div className="p-3 border-b border-zinc-200 bg-white">
+            <Button 
+                onClick={() => router.push('/explore')} 
+                variant="outline" 
+                className="w-full gap-2 text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100 shadow-sm transition-all"
+            >
+                <Globe className="h-4 w-4" />
+                Khám phá Cộng đồng
+            </Button>
+        </div>
 
         <div className="flex-1 overflow-y-auto p-2">
             <FolderTree 
@@ -225,7 +203,7 @@ export default function Home() {
               onDelete={handleDelete}
               onNavigate={handleNavigate}
               onRename={openRenameDialog}
-              onShare={handleOpenShare} // <--- TRUYỀN HÀM XUỐNG CÂY
+              onShare={handleOpenShare} 
               onMove={handleMoveItem} 
             />
         </div>
@@ -248,13 +226,10 @@ export default function Home() {
                             <span className="text-[10px] font-bold uppercase text-zinc-400 border px-1 rounded">{deck.type}</span>
                             <button onClick={(e) => { e.stopPropagation(); handleDelete(deck.id, deck.type) }} className="p-1 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Settings className="h-3 w-3" /></button>
                         </div>
-                        
-                        {/* ĐÃ FIX: Bọc title vào thẻ span */}
                         <h3 className={cn("font-semibold text-sm text-zinc-800 mb-3 flex items-start gap-1.5", status === 'DONE' && "line-through")}>
                             <span className="flex-1 line-clamp-2">{deck.name}</span>
                             {deck.is_downloaded && <span title="Khóa học tải từ cộng đồng"><CloudDownload className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" /></span>}
                         </h3>
-                        
                         {status === 'IN_PROGRESS' && (
                             <div className="space-y-1">
                                 <div className="flex justify-between text-[10px] text-zinc-400"><span className="flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Tiến độ ({deck.total_cards || 0} từ)</span><span>{deck.progress_percent || 0}%</span></div>
@@ -290,7 +265,6 @@ export default function Home() {
         onRenamed={fetchAllData}
       />
 
-      {/* POPUP SHARE ĐƯỢC NHÚNG VÀO ĐÂY */}
       <ShareDeckDialog 
         externalOpen={shareDialog.open}
         onExternalOpenChange={(val) => setShareDialog(prev => ({ ...prev, open: val }))}
