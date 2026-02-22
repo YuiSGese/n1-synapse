@@ -6,8 +6,6 @@ import { cn } from '@/lib/utils'
 import { CheckCircle2, XCircle } from 'lucide-react'
 import { speakText } from '@/components/deck/flashcard'
 
-// Hàm làm sạch văn bản (Loại bỏ Romaji trong ngoặc)
-// Ví dụ: "ほうもん (houmon)" -> "ほうもん"
 const cleanText = (text: string) => {
   if (!text) return ''
   return text.split('(')[0].trim()
@@ -17,50 +15,50 @@ interface QuizMultipleChoiceProps {
   vocab: any
   allVocabs: any[]
   mode: 'meaning' | 'reading'
+  direction?: 'forward' | 'reverse' // 'forward' (Kanji -> Nghĩa), 'reverse' (Nghĩa -> Kanji)
   onResult: (isCorrect: boolean) => void
 }
 
-export function QuizMultipleChoice({ vocab, allVocabs, mode, onResult }: QuizMultipleChoiceProps) {
+export function QuizMultipleChoice({ vocab, allVocabs, mode, direction = 'forward', onResult }: QuizMultipleChoiceProps) {
   const [selected, setSelected] = useState<string | null>(null)
   const [isAnswered, setIsAnswered] = useState(false)
 
-  // Reset trạng thái khi chuyển câu hỏi
   useEffect(() => {
     setSelected(null)
     setIsAnswered(false)
   }, [vocab])
 
-  // 1. Xác định Câu hỏi và Đáp án đúng
-  const questionText = vocab.word
-  
-  // Lấy đáp án đúng và làm sạch nếu là chế độ Reading
-  const rawCorrectAnswer = mode === 'meaning' ? vocab.meaning : vocab.reading
-  const correctAnswer = mode === 'reading' ? cleanText(rawCorrectAnswer) : rawCorrectAnswer
+  const isReverse = direction === 'reverse'
 
-  // 2. Tạo danh sách đáp án
+  // 1. Xác định Câu hỏi và Đáp án đúng dựa theo chiều học
+  const questionText = isReverse
+      ? (mode === 'meaning' ? vocab.meaning : cleanText(vocab.reading))
+      : vocab.word
+
+  const correctAnswer = isReverse
+      ? vocab.word
+      : (mode === 'meaning' ? vocab.meaning : cleanText(vocab.reading))
+
+  // 2. Tạo danh sách đáp án nhiễu
   const options = useMemo(() => {
     if (!vocab || !allVocabs) return []
     
-    // Lấy các từ khác làm đáp án nhiễu
     const distractors = allVocabs
       .filter(v => v.id !== vocab.id)
       .sort(() => 0.5 - Math.random())
       .slice(0, 3)
       .map(v => {
-        const val = mode === 'meaning' ? v.meaning : v.reading
-        // Làm sạch đáp án nhiễu nếu là chế độ Reading
-        return mode === 'reading' ? cleanText(val) : val
+        if (isReverse) return v.word // Nếu học ngược, đáp án chọn sẽ là Kanji
+        return mode === 'meaning' ? v.meaning : cleanText(v.reading)
       })
     
-    // Nếu thiếu, thêm placeholder
     while (distractors.length < 3) {
       distractors.push("...")
     }
 
-    // Gộp và trộn ngẫu nhiên
     const choices = [correctAnswer, ...distractors]
     return choices.sort(() => 0.5 - Math.random())
-  }, [vocab, allVocabs, mode, correctAnswer])
+  }, [vocab, allVocabs, mode, correctAnswer, isReverse])
 
   const handleSelect = (answer: string) => {
     if (isAnswered) return
@@ -69,32 +67,51 @@ export function QuizMultipleChoice({ vocab, allVocabs, mode, onResult }: QuizMul
     
     const isCorrect = answer === correctAnswer
     
-    // Phát âm từ vựng khi chọn đúng
-    if (isCorrect) {
-      speakText(vocab.word) 
-    }
+    // Luôn phát âm từ gốc (Kanji) khi chọn đúng
+    if (isCorrect) speakText(vocab.word) 
     
-    // Chuyển câu sau 1s
     setTimeout(() => {
         onResult(isCorrect)
     }, 1000)
   }
 
+  // Tiêu đề gợi ý
+  let guideText = "Chọn đáp án đúng"
+  if (mode === 'meaning') guideText = isReverse ? 'Chọn Kanji tương ứng' : 'Chọn nghĩa đúng'
+  if (mode === 'reading') guideText = isReverse ? 'Chọn Kanji tương ứng' : 'Chọn cách đọc đúng'
+
+  // Chỉ hiện Âm Hán Việt nếu đang học xuôi (hiển thị Kanji ở câu hỏi) và có dữ liệu
+  const showKanjiMeaning = !isReverse && !!vocab.kanji_meaning
+
   return (
     <div className="flex flex-col items-center justify-center h-full w-full max-w-lg mx-auto p-4 animate-in zoom-in-95 duration-300">
       
       {/* CÂU HỎI */}
-      <div className="w-full bg-white border-2 border-zinc-100 rounded-3xl p-8 mb-8 shadow-sm flex flex-col items-center justify-center min-h-[200px] relative overflow-hidden">
-        <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-4">
-          {mode === 'meaning' ? 'Chọn nghĩa đúng' : 'Chọn cách đọc đúng'}
+      <div className="w-full bg-white border-2 border-zinc-100 rounded-3xl p-8 mb-8 shadow-sm flex flex-col items-center justify-center min-h-[220px] relative overflow-hidden">
+        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-6 block text-center">
+          {guideText}
         </span>
-        <h2 className="text-6xl md:text-7xl font-black text-zinc-900 text-center break-words leading-tight">
+        
+        {/* Badge Âm Hán Việt */}
+        {showKanjiMeaning && (
+           <div className="mb-3">
+              <span className="text-xs uppercase tracking-widest text-zinc-500 font-bold border border-zinc-200 px-2.5 py-1 rounded-md bg-zinc-50 shadow-sm">
+                {vocab.kanji_meaning}
+              </span>
+           </div>
+        )}
+
+        {/* Text Câu hỏi (Chỉnh size nhỏ hơn nếu là Nghĩa tiếng Việt dài) */}
+        <h2 className={cn(
+            "font-black text-zinc-900 text-center break-words leading-tight",
+            isReverse ? "text-4xl md:text-5xl" : "text-6xl md:text-7xl"
+        )}>
           {questionText}
         </h2>
         
-        {/* Hiện cách đọc sau khi trả lời (nếu là mode meaning) */}
-        {mode === 'meaning' && isAnswered && (
-           <p className="text-zinc-400 mt-2 font-light text-xl animate-in fade-in">{cleanText(vocab.reading)}</p>
+        {/* Gợi ý sau khi trả lời (Tùy chọn) */}
+        {isAnswered && !isReverse && mode === 'meaning' && (
+           <p className="text-zinc-400 mt-4 font-light text-xl animate-in fade-in">{cleanText(vocab.reading)}</p>
         )}
       </div>
 
@@ -121,15 +138,16 @@ export function QuizMultipleChoice({ vocab, allVocabs, mode, onResult }: QuizMul
                     key={idx}
                     variant="outline"
                     className={cn(
-                        "h-16 justify-start px-6 text-base md:text-lg relative transition-all duration-200 rounded-2xl shadow-sm",
-                        stateClass
+                        "min-h-16 h-auto py-3 justify-start px-6 text-base md:text-lg relative transition-all duration-200 rounded-2xl shadow-sm whitespace-normal",
+                        stateClass,
+                        isReverse ? "font-bold text-xl md:text-2xl" : "font-medium" // Nhấn mạnh Kanji ở đáp án nếu học ngược
                     )}
                     onClick={() => handleSelect(opt)}
                     disabled={isAnswered || opt === "..."}
                 >
                     {/* Badge A, B, C, D */}
                     <span className={cn(
-                        "mr-4 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold border transition-colors",
+                        "mr-4 shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold border transition-colors",
                         isAnswered && isCorrectOption 
                             ? "border-green-600 bg-green-200 text-green-800" 
                             : "border-zinc-200 bg-zinc-100 text-zinc-400"
@@ -137,10 +155,10 @@ export function QuizMultipleChoice({ vocab, allVocabs, mode, onResult }: QuizMul
                         {String.fromCharCode(65 + idx)}
                     </span>
                     
-                    <span className="truncate flex-1 text-left font-medium">{opt}</span>
+                    <span className="flex-1 text-left leading-snug">{opt}</span>
 
-                    {isAnswered && isCorrectOption && <CheckCircle2 className="h-6 w-6 text-green-600 ml-2 animate-in zoom-in" />}
-                    {isAnswered && isSelected && !isCorrectOption && <XCircle className="h-6 w-6 text-red-600 ml-2 animate-in zoom-in" />}
+                    {isAnswered && isCorrectOption && <CheckCircle2 className="h-6 w-6 shrink-0 text-green-600 ml-2 animate-in zoom-in" />}
+                    {isAnswered && isSelected && !isCorrectOption && <XCircle className="h-6 w-6 shrink-0 text-red-600 ml-2 animate-in zoom-in" />}
                 </Button>
             )
         })}

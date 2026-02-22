@@ -11,19 +11,20 @@ import { Trophy, RefreshCcw, ArrowLeft } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { calculateSRS, SRSData } from '@/lib/srs'
 
+// ĐÃ FIX LỖI: Bổ sung định nghĩa QuestionItem
+type QuestionItem = {
+  type: 'meaning' | 'reading' | 'typing' | 'matching'
+  data: any
+}
+
 interface QuizSessionProps {
   vocabList: any[]
   mode: QuizMode
+  options?: any // <--- NHẬN PROPS LỰA CHỌN CHIỀU HỌC
   onExit: () => void
 }
 
-// Định nghĩa cấu trúc của 1 câu hỏi trong phiên chơi
-type QuestionItem = {
-  type: 'meaning' | 'reading' | 'typing' | 'matching'
-  data: any // Có thể là 1 từ (object) hoặc 1 mảng từ (matching)
-}
-
-export function QuizSession({ vocabList, mode, onExit }: QuizSessionProps) {
+export function QuizSession({ vocabList, mode, options, onExit }: QuizSessionProps) {
   const [questions, setQuestions] = useState<QuestionItem[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [score, setScore] = useState(0)
@@ -44,7 +45,6 @@ export function QuizSession({ vocabList, mode, onExit }: QuizSessionProps) {
         const remaining = shuffled.length - i
         
         // Danh sách các loại bài có thể ra
-        // Matching cần ít nhất 4 từ để chơi vui
         const possibleTypes: ('meaning' | 'reading' | 'typing' | 'matching')[] = ['meaning', 'reading', 'typing']
         if (remaining >= 4) possibleTypes.push('matching')
 
@@ -74,7 +74,6 @@ export function QuizSession({ vocabList, mode, onExit }: QuizSessionProps) {
       total = shuffled.length
     } else {
       // --- LOGIC SINGLE MODES (Meaning, Reading, Typing) ---
-      // Ép kiểu mode sang dạng đơn lẻ an toàn
       const singleMode = mode as 'meaning' | 'reading' | 'typing'
       newQuestions = shuffled.map(v => ({ type: singleMode, data: v }))
       total = shuffled.length
@@ -113,7 +112,6 @@ export function QuizSession({ vocabList, mode, onExit }: QuizSessionProps) {
     if (isCorrect) setScore(s => s + 1)
     
     const currentQuestion = questions[currentIndex]
-    // Với dạng single, data chính là vocab object
     await updateSRS(currentQuestion.data.id, isCorrect)
 
     nextQuestion()
@@ -173,16 +171,13 @@ export function QuizSession({ vocabList, mode, onExit }: QuizSessionProps) {
 
   if (questions.length === 0) return <div className="p-10 text-center text-zinc-400">Đang tạo bài tập...</div>
 
-  // Lấy câu hỏi hiện tại
   const currentQ = questions[currentIndex]
-  
-  // Tính toán tiến độ
   const progressVal = ((currentIndex) / questions.length) * 100
 
   return (
     <div className="h-full flex flex-col">
         {/* Header */}
-        <div className="h-10 flex items-center px-4 md:px-8 justify-between shrink-0">
+        <div className="h-16 border-b border-zinc-100 flex items-center px-4 md:px-8 justify-between shrink-0">
             <Button variant="ghost" size="icon" onClick={onExit} className="text-zinc-400 hover:text-zinc-900">
                 <ArrowLeft className="w-5 h-5" />
             </Button>
@@ -191,7 +186,7 @@ export function QuizSession({ vocabList, mode, onExit }: QuizSessionProps) {
                     <span>Quiz Progress</span>
                     <span>{Math.round(progressVal)}%</span>
                 </div>
-                <Progress value={progressVal} className="h-1" />
+                <Progress value={progressVal} className="h-2" />
             </div>
             <div className="w-9" />
         </div>
@@ -214,6 +209,7 @@ export function QuizSession({ vocabList, mode, onExit }: QuizSessionProps) {
                     vocab={currentQ.data}
                     allVocabs={vocabList}
                     mode={currentQ.type}
+                    direction={options?.direction || 'forward'} // <--- TRUYỀN HƯỚNG XUỐNG THẺ
                     onResult={handleSingleAnswer}
                 />
               )

@@ -15,6 +15,7 @@ type ViewState = 'selection' | 'flashcard' | 'quiz_setup' | 'quiz_session'
 export function ReviewManager({ vocabList }: ReviewManagerProps) {
   const [view, setView] = useState<ViewState>('selection')
   const [quizMode, setQuizMode] = useState<QuizMode>('meaning') // Mặc định
+  const [quizOptions, setQuizOptions] = useState<any>(null) // <--- THÊM STATE NÀY
 
   // 1. Màn hình chọn (Flashcard / Quiz)
   if (view === 'selection') {
@@ -32,8 +33,9 @@ export function ReviewManager({ vocabList }: ReviewManagerProps) {
   // 3. Màn hình Setup Quiz
   if (view === 'quiz_setup') {
     return <QuizSetup 
-        onStart={(mode) => {
+        onStart={(mode, options) => { // <--- NHẬN THÊM OPTIONS
             setQuizMode(mode)
+            setQuizOptions(options)
             setView('quiz_session')
         }} 
         onBack={() => setView('selection')} 
@@ -45,6 +47,7 @@ export function ReviewManager({ vocabList }: ReviewManagerProps) {
     return <QuizSession 
         vocabList={vocabList} 
         mode={quizMode} 
+        options={quizOptions} // <--- TRUYỀN XUỐNG ĐÂY
         onExit={() => setView('quiz_setup')} 
     />
   }
