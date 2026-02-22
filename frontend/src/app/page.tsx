@@ -193,6 +193,16 @@ export default function Home() {
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-zinc-50">
+        <div className="p-3 border-b border-zinc-200 bg-white">
+            <Button 
+                onClick={() => router.push('/explore')} 
+                variant="outline" 
+                className="w-full gap-2 text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100 shadow-sm transition-all"
+            >
+                <Globe className="h-4 w-4" />
+                Khám phá Cộng đồng
+            </Button>
+        </div>
         <div className="p-3 border-b border-zinc-200 flex justify-between items-center bg-white sticky top-0 z-10 group">
             <h2 className="font-bold text-xs text-zinc-500 uppercase tracking-wider flex items-center gap-2">
               <FolderOpen className="h-3.5 w-3.5" /> Kho dữ liệu
@@ -204,16 +214,7 @@ export default function Home() {
             </div>
         </div>
 
-        <div className="p-3 border-b border-zinc-200 bg-white">
-            <Button 
-                onClick={() => router.push('/explore')} 
-                variant="outline" 
-                className="w-full gap-2 text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100 shadow-sm transition-all"
-            >
-                <Globe className="h-4 w-4" />
-                Khám phá Cộng đồng
-            </Button>
-        </div>
+        
 
         <div className="flex-1 overflow-y-auto p-2">
             <FolderTree 
