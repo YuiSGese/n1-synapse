@@ -120,10 +120,13 @@ async def lookup_word(req: VocabRequest):
         Trả về JSON thuần túy (không markdown):
         {{
             "reading": "Hiragana",
+            "kanji_meaning": "Âm Hán Việt (nếu có, viết HOA. VD: TIÊN SINH)",
             "meaning": "Nghĩa tiếng Việt ngắn gọn",
             "part_of_speech": "Từ loại",
-            "example_sentence": "Câu ví dụ tiếng Nhật N1",
-            "example_translation": "Dịch nghĩa câu ví dụ"
+            "example_sentence": "Câu ví dụ tiếng Nhật N1 số 1",
+            "example_translation": "Dịch nghĩa câu ví dụ 1",
+            "example_sentence_2": "Câu ví dụ tiếng Nhật N1 số 2 (ngữ cảnh khác)",
+            "example_translation_2": "Dịch nghĩa câu ví dụ 2"
         }}
         """
         response = generate_content_with_fallback(prompt, 'gemini-2.0-flash')
@@ -140,7 +143,9 @@ async def lookup_word(req: VocabRequest):
                     "meaning": data.get("meaning"),
                     "part_of_speech": data.get("part_of_speech"),
                     "example_sentence": data.get("example_sentence"),
-                    "example_translation": data.get("example_translation")
+                    "example_translation": data.get("example_translation"),
+                    "example_sentence_2": data.get("example_sentence_2"),  # <--- THÊM DÒNG NÀY
+                    "example_translation_2": data.get("example_translation_2")  # <--- THÊM DÒNG NÀY
                 }
                 
                 async with httpx.AsyncClient() as client:

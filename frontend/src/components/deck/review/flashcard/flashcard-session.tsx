@@ -180,6 +180,7 @@ export function FlashcardSession({ vocabList, onExit }: FlashcardSessionProps) {
             </div>
           </div>
 
+          {/* TẠM ẨN CỤM NÚT ĐÁNH GIÁ SRS
           {isFlipped && !isPlaying ? (
             <div className="flex items-center justify-between gap-3 animate-in slide-in-from-bottom-2 fade-in duration-300">
               <Button onClick={() => handleRate(1)} className="flex-1 bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 h-14 rounded-xl flex-col gap-1"><Frown className="h-5 w-5" /><span className="text-[10px] uppercase font-bold">Quên</span></Button>
@@ -187,11 +188,13 @@ export function FlashcardSession({ vocabList, onExit }: FlashcardSessionProps) {
               <Button onClick={() => handleRate(3)} className="flex-1 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-100 h-14 rounded-xl flex-col gap-1"><Smile className="h-5 w-5" /><span className="text-[10px] uppercase font-bold">Được</span></Button>
               <Button onClick={() => handleRate(4)} className="flex-1 bg-green-50 text-green-600 hover:bg-green-100 border border-green-100 h-14 rounded-xl flex-col gap-1"><CheckCircle2 className="h-5 w-5" /><span className="text-[10px] uppercase font-bold">Dễ</span></Button>
             </div>
-          ) : (
+          ) : ( 
+          */}
+
             <div className="flex items-center justify-between animate-in slide-in-from-bottom-2 fade-in duration-300">
               <Button variant="ghost" size="icon" onClick={handleShuffle} className="text-zinc-400 hover:text-zinc-900"><Shuffle className="h-5 w-5" /></Button>
               <Button variant="ghost" size="icon" onClick={scrollPrev} disabled={!emblaApi?.canScrollPrev()} className="text-zinc-800 hover:bg-zinc-100 h-10 w-10"><SkipBack className="h-6 w-6" /></Button>
-              <Button size="icon" onClick={togglePlay} className={cn("h-14 w-14 rounded-full shadow-xl hover:scale-105 transition-all", isPlaying ? "bg-zinc-900" : "bg-zinc-900")}>
+              <Button size="icon" onClick={togglePlay} className={cn("h-10 w-10 rounded-full shadow-xl hover:scale-105 transition-all", isPlaying ? "bg-zinc-900" : "bg-zinc-900")}>
                 {isPlaying ? <Pause className="h-6 w-6 text-white" /> : <Play className="h-6 w-6 text-white ml-1" />}
               </Button>
               <Button variant="ghost" size="icon" onClick={scrollNext} disabled={!emblaApi?.canScrollNext()} className="text-zinc-800 hover:bg-zinc-100 h-10 w-10"><SkipForward className="h-6 w-6" /></Button>
@@ -216,7 +219,8 @@ export function FlashcardSession({ vocabList, onExit }: FlashcardSessionProps) {
                 </PopoverContent>
               </Popover>
             </div>
-          )}
+            
+          {/* )} */}
         </div>
       </div>
     </div>

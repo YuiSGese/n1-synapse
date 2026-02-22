@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils"
 import { Volume2 } from "lucide-react"
-import { VocabPopover } from '@/components/deck/vocab-popover' // Giả sử vocab-popover vẫn ở chỗ cũ hoặc bạn có thể chuyển nó vào review/quiz nếu muốn
+import { VocabPopover } from '@/components/deck/vocab-popover'
 import { useState, useEffect } from 'react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
@@ -44,8 +44,7 @@ function InteractiveExample({ text }: { text: string }) {
         if (isMounted) {
           const tokenNodes = data.tokens.map((t: string, i: number) => (
             <VocabPopover key={i} word={t}>
-              {/* Dùng inline-block để text liền mạch */}
-              <span className="cursor-pointer hover:bg-zinc-700 hover:text-white transition-colors py-0.5 rounded-sm select-text">
+              <span className="cursor-pointer hover:bg-zinc-700 hover:text-white transition-colors py-0.5 rounded-sm select-text inline-block">
                 {t}
               </span>
             </VocabPopover>
@@ -73,13 +72,6 @@ export function FlashcardItem({ vocab, isFlipped, onFlip }: FlashcardItemProps) 
     speakText(vocab.word)
   }
 
-  const handleSpeakExample = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (vocab.examples?.[0]?.sentence) {
-      speakText(vocab.examples[0].sentence)
-    }
-  }
-
   const cleanHiragana = cleanReading(vocab.reading)
 
   return (
@@ -99,6 +91,7 @@ export function FlashcardItem({ vocab, isFlipped, onFlip }: FlashcardItemProps) 
             <button 
               onClick={handleSpeakWord} 
               className="p-4 bg-zinc-50 rounded-full hover:bg-zinc-100 text-zinc-600 transition-colors"
+              title="Phát âm"
             >
               <Volume2 className="h-6 w-6" />
             </button>
@@ -113,41 +106,68 @@ export function FlashcardItem({ vocab, isFlipped, onFlip }: FlashcardItemProps) 
         </div>
 
         {/* MẶT SAU (Nền đen) */}
-        <div className="absolute w-full h-full backface-hidden rotate-y-180 bg-zinc-900 text-white flex flex-col items-center justify-center px-6 py-8">
-          <div className="absolute top-6 right-6 z-10">
-            <button onClick={handleSpeakExample} className="p-3 bg-zinc-800 rounded-full hover:bg-zinc-700 transition">
-              <Volume2 className="h-6 w-6 text-zinc-400" />
-            </button>
-          </div>
-          
-          <div className="flex flex-col items-center w-full max-w-md h-full justify-center gap-6">
+        <div className="absolute w-full h-full backface-hidden rotate-y-180 bg-zinc-900 text-white overflow-y-auto no-scrollbar">
+          {/* Dùng min-h-full để khi ít nội dung thì nó tự căn giữa, nhiều thì cho phép cuộn */}
+          <div className="min-h-full flex flex-col items-center justify-center px-6 py-10 w-full max-w-lg mx-auto">
             
-            {/* 1. Phiên âm Hiragana (Đậm, Lớn) */}
-            <div className="text-4xl font-bold text-blue-400 tracking-wide">
-              {cleanHiragana}
-            </div>
-
-            {/* 2. Từ Kanji (Nhắc lại) */}
-            <div className="text-xl text-zinc-500 font-medium tracking-widest">
-              {vocab.word}
-            </div>
-
-            {/* 3. Nghĩa Tiếng Việt (Vừa phải) */}
-            <div className="text-2xl font-semibold leading-snug text-white/90 text-center border-t border-zinc-800 pt-4 w-full">
-              {vocab.meaning}
-            </div>
-            
-            {/* 4. Ví dụ (Bỏ khung, Chữ to, Interactive) */}
-            {vocab.examples?.[0]?.sentence && (
-              <div className="w-full mt-4 text-center" onClick={(e) => e.stopPropagation()}>
-                {/* Component tách từ click được */}
-                <InteractiveExample text={vocab.examples[0].sentence} />
-                
-                <p className="text-base text-zinc-500 italic mt-3 font-light">
-                  {vocab.examples[0].translation}
-                </p>
+            {/* --- KHỐI TỪ VỰNG CHÍNH --- */}
+            <div className="flex flex-col items-center w-full">
+              {/* 1. Phiên âm Hiragana (Furigana - Nhỏ, nằm trên) */}
+              <div className="text-xl md:text-2xl font-bold text-blue-400 tracking-wide mb-2">
+                {cleanHiragana}
               </div>
+
+              {/* 2. Từ Kanji (Chữ to, nằm dưới) */}
+              <div className="text-5xl md:text-6xl font-black text-white tracking-widest mb-5 text-center leading-tight">
+                {vocab.word}
+              </div>
+
+              {/* 3. Nghĩa Tiếng Việt */}
+              <div className="text-xl md:text-2xl font-semibold text-white/90 text-center">
+                {vocab.meaning}
+              </div>
+            </div>
+            
+            {/* Lằn gạch chia cách (Chỉ hiện nếu có ví dụ) */}
+            {vocab.examples && vocab.examples.length > 0 && (
+                <div className="w-full border-t border-zinc-800 my-6"></div>
             )}
+            
+            {/* --- KHỐI VÍ DỤ --- */}
+            {/* Dừng sự kiện click để thẻ không bị lật lại khi user đang thao tác với câu ví dụ */}
+            <div className="w-full flex flex-col gap-8" onClick={(e) => e.stopPropagation()}>
+              {vocab.examples?.map((ex: any, idx: number) => {
+                if (!ex.sentence) return null;
+                
+                return (
+                  <div key={idx} className="flex flex-col gap-2 w-full">
+                    {/* Hàng chứa Nút loa + Câu tiếng Nhật */}
+                    <div className="flex items-start gap-3">
+                        <button 
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              speakText(ex.sentence); 
+                            }}
+                            className="mt-1 shrink-0 p-2 bg-zinc-800 rounded-full hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white"
+                            title={`Nghe ví dụ ${idx + 1}`}
+                        >
+                            <Volume2 className="h-4 w-4" />
+                        </button>
+                        
+                        <div className="flex-1 pt-0.5">
+                            <InteractiveExample text={ex.sentence} />
+                        </div>
+                    </div>
+
+                    {/* Dịch nghĩa tiếng Việt (thụt lề cho thẳng với câu trên) */}
+                    <p className="text-base md:text-lg text-zinc-500 italic font-light ml-11 text-left">
+                        {ex.translation}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+
           </div>
         </div>
       </div>

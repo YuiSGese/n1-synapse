@@ -8,7 +8,6 @@ import {
 } from "@/components/ui/popover"
 import { Loader2, BookOpen, RefreshCw, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { toast } from 'sonner'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
 
@@ -82,13 +81,22 @@ export function VocabPopover({ word, children, isTarget }: VocabPopoverProps) {
       </PopoverTrigger>
       
       <PopoverContent className="w-80 p-0 overflow-hidden border-zinc-200 shadow-xl z-50" side="top">
-        {/* Header */}
-        <div className={`px-4 py-3 border-b flex items-center justify-between ${isTarget ? 'bg-purple-50 border-purple-100' : 'bg-zinc-50 border-zinc-100'}`}>
-          <div className="flex items-baseline gap-2">
-            <h4 className="font-bold text-lg text-zinc-800">{word}</h4>
-            {data?.reading && <span className="text-sm text-zinc-500 font-normal">({data.reading})</span>}
+        {/* Header - Đã cập nhật hiển thị Âm Hán Việt */}
+        <div className={`px-4 py-3 border-b flex items-start justify-between ${isTarget ? 'bg-purple-50 border-purple-100' : 'bg-zinc-50 border-zinc-100'}`}>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2">
+              <h4 className="font-bold text-lg text-zinc-800 leading-none">{word}</h4>
+              {/* Hiển thị Âm Hán Việt nếu có */}
+              {data?.kanji_meaning && (
+                <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold border border-zinc-200 px-1.5 py-0.5 rounded bg-white leading-none">
+                  {data.kanji_meaning}
+                </span>
+              )}
+            </div>
+            {/* Cách đọc Hiragana */}
+            {data?.reading && <span className="text-sm text-blue-600 font-medium">{data.reading}</span>}
           </div>
-          {isTarget && <span className="text-[10px] uppercase font-bold bg-purple-200 text-purple-700 px-2 py-0.5 rounded">Target</span>}
+          {isTarget && <span className="text-[10px] uppercase font-bold bg-purple-200 text-purple-700 px-2 py-0.5 rounded mt-0.5">Target</span>}
         </div>
         
         {/* Body */}
@@ -123,12 +131,21 @@ export function VocabPopover({ word, children, isTarget }: VocabPopoverProps) {
                 <p className="text-zinc-800 font-medium text-base">{data.meaning}</p>
               </div>
               
-              {/* Ví dụ */}
+              {/* Ví dụ 1 */}
               {data.example_sentence && (
                 <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100 mt-2">
-                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block mb-1">Ví dụ ngữ cảnh</span>
+                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Ví dụ 1</span>
                   <p className="text-sm text-zinc-700 mb-1 leading-relaxed">{data.example_sentence}</p>
                   <p className="text-xs text-zinc-500 italic border-t border-zinc-200 pt-1 mt-1">{data.example_translation}</p>
+                </div>
+              )}
+
+              {/* Ví dụ 2 (Nếu AI trả về) */}
+              {data.example_sentence_2 && (
+                <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-100 mt-2">
+                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Ví dụ 2</span>
+                  <p className="text-sm text-zinc-700 mb-1 leading-relaxed">{data.example_sentence_2}</p>
+                  <p className="text-xs text-zinc-500 italic border-t border-zinc-200 pt-1 mt-1">{data.example_translation_2}</p>
                 </div>
               )}
             </div>

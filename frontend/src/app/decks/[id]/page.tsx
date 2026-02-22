@@ -9,8 +9,7 @@ import { ArrowLeft, BookOpen, Layers, PlayCircle } from 'lucide-react'
 import { SmartVocabEntry } from '@/components/deck/smart-vocab-entry'
 import { StoryGenerator } from '@/components/deck/story-generator'
 import { ReviewManager } from '@/components/deck/review/review-manager'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Trash2 } from 'lucide-react'
+import { EditableVocabRow } from '@/components/deck/editable-vocab-row' // <--- IMPORT COMPONENT EDIT MỚI
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 
@@ -86,7 +85,7 @@ export default function DeckDetailPage() {
     <div className="h-screen bg-white text-zinc-900 font-sans flex flex-col overflow-hidden">
       
       {/* TABS CONTAINER */}
-      <Tabs defaultValue="review" className="flex flex-col h-full">
+      <Tabs defaultValue="vocab" className="flex flex-col h-full">
         
         {/* HEADER */}
         <header className="h-14 border-b border-zinc-200 flex items-center px-2 md:px-4 gap-2 sticky top-0 bg-white z-20 shrink-0">
@@ -125,40 +124,34 @@ export default function DeckDetailPage() {
 
             <SmartVocabEntry deckId={params.id as string} onAdded={fetchVocab} />
             
+            {/* THAY THẾ TABLE CŨ BẰNG EDITABLE ROW MỚI */}
             <div className="border border-zinc-200 rounded-lg overflow-hidden shadow-sm bg-white">
-              <Table>
-                <TableHeader className="bg-zinc-50">
-                  <TableRow>
-                    <TableHead>Từ vựng</TableHead>
-                    <TableHead>Nghĩa</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {vocabList.map((vocab) => (
-                    <TableRow key={vocab.id}>
-                      <TableCell className="font-bold">{vocab.word}</TableCell>
-                      <TableCell>{vocab.meaning}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteVocab(vocab.id)}>
-                          <Trash2 className="h-4 w-4 text-zinc-300 hover:text-red-500" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {vocabList.length === 0 && (
-                    <TableRow>
-                        <TableCell colSpan={3} className="text-center py-8 text-zinc-400">Chưa có từ vựng nào</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                {/* Header của danh sách */}
+                <div className="flex items-center p-4 py-3 border-b border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-500 uppercase tracking-wider">
+                    <div className="w-1/3">Từ vựng</div>
+                    <div className="w-2/3 pl-1">Nghĩa</div>
+                </div>
+
+                {/* Danh sách từ vựng */}
+                <div>
+                    {vocabList.length === 0 ? (
+                        <div className="text-center py-10 text-zinc-400 italic text-sm">Chưa có từ vựng nào trong bài học này.</div>
+                    ) : (
+                        vocabList.map((vocab) => (
+                            <EditableVocabRow 
+                                key={vocab.id} 
+                                vocab={vocab} 
+                                onDelete={handleDeleteVocab} 
+                                onUpdated={fetchVocab} 
+                            />
+                        ))
+                    )}
+                </div>
             </div>
           </TabsContent>
 
           {/* TAB 2: REVIEW */}
           <TabsContent value="review" className="h-full mt-0">
-            {/* Truyền component quản lý review mới vào */}
             <div className="h-full w-full p-0 md:p-6 md:max-w-4xl md:mx-auto flex flex-col justify-center">
               <ReviewManager vocabList={vocabList} />
             </div>
