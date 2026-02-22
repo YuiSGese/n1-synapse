@@ -1,12 +1,11 @@
 'use client'
 
-// ... (Các import giữ nguyên)
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { Settings, LogOut, User, FolderOpen, RefreshCcw, FilePlus, FolderPlus, Menu, Plus, CheckCircle2, TrendingUp } from 'lucide-react'
+import { Settings, LogOut, User, FolderOpen, RefreshCcw, FilePlus, FolderPlus, Menu, Plus, CheckCircle2, TrendingUp, Globe, CloudDownload } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,12 +18,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { CreateDeckDialog } from '@/components/dashboard/create-deck-dialog'
 import { RenameDialog } from '@/components/dashboard/rename-dialog'
 import { FolderTree, TreeNode } from '@/components/dashboard/folder-tree'
+import { ShareDeckDialog } from '@/components/deck/share-deck-dialog' // <--- IMPORT
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { Progress } from "@/components/ui/progress"
 
-// ... (Giữ nguyên Type Deck)
 type Deck = {
   id: string
   name: string
@@ -34,10 +33,10 @@ type Deck = {
   description?: string
   total_cards?: number
   progress_percent?: number 
+  is_downloaded?: boolean 
 }
 
 export default function Home() {
-  // ... (Giữ nguyên các hook và state)
   const router = useRouter()
   const supabase = createClient()
   const [user, setUser] = useState<any>(null)
@@ -49,59 +48,65 @@ export default function Home() {
     open: boolean;
     parentId: string | null;
     type: 'folder' | 'deck';
-  }>({
-    open: false,
-    parentId: null,
-    type: 'folder'
-  })
+  }>({ open: false, parentId: null, type: 'folder' })
 
   const [renameDialog, setRenameDialog] = useState<{
     open: boolean;
     id: string | null;
     name: string;
     type: string;
-  }>({
-    open: false,
-    id: null,
-    name: '',
-    type: 'deck'
-  })
+  }>({ open: false, id: null, name: '', type: 'deck' })
 
-  // ... (Giữ nguyên fetchAllData, useEffects)
+  // TẠO STATE CHO POPUP SHARE TỪ SIDEBAR
+  const [shareDialog, setShareDialog] = useState<{
+    open: boolean;
+    deck: any;
+  }>({ open: false, deck: null })
+
   const handleNavigate = (id: string) => router.push(`/decks/${id}`)
 
-  const calculateDeckProgress = (vocabs: any[]) => {
-    // ... (Giữ nguyên logic tính điểm)
+  const calculateDeckProgress = useCallback((vocabs: any[]) => {
     if (!vocabs || vocabs.length === 0) return 0
     let totalScore = 0
     vocabs.forEach(v => {
-      const interval = v.interval || 0
-      if (interval > 7) totalScore += 100
-      else if (interval > 3) totalScore += 80
-      else if (interval > 1) totalScore += 50
-      else if (interval > 0) totalScore += 20
-      else totalScore += 0
+      if (v.interval > 7) totalScore += 100
+      else if (v.interval > 3) totalScore += 80
+      else if (v.interval > 1) totalScore += 50
+      else if (v.interval > 0) totalScore += 20
     })
     return Math.round(totalScore / vocabs.length)
-  }
+  }, [])
 
   const fetchAllData = useCallback(async () => {
     setLoading(true)
     try {
-      const { data: decksData, error: decksError } = await supabase.from('decks').select('*').order('name', { ascending: true })
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: decksData, error: decksError } = await supabase
+        .from('decks_with_progress') 
+        .select('*')
+        .eq('user_id', user.id)      
+        .order('created_at', { ascending: false })
+
       if (decksError) throw decksError
+      
       const { data: vocabData, error: vocabError } = await supabase.from('vocab').select('deck_id, interval')
       if (vocabError) throw vocabError
+      
       const decksWithProgress = decksData.map((deck: any) => {
         const deckVocabs = vocabData?.filter((v: any) => v.deck_id === deck.id) || []
         const progress = calculateDeckProgress(deckVocabs)
         return { ...deck, total_cards: deckVocabs.length, progress_percent: progress }
       })
+      
       setAllItems(decksWithProgress as Deck[])
     } catch (error) {
       console.error(error); toast.error("Lỗi tải dữ liệu")
-    } finally { setLoading(false) }
-  }, [supabase])
+    } finally { 
+      setLoading(false) 
+    }
+  }, [supabase, calculateDeckProgress])
 
   useEffect(() => {
     const checkUser = async () => {
@@ -128,11 +133,17 @@ export default function Home() {
     setRenameDialog({ open: true, id, name, type })
   }
 
-  // --- LOGIC MỚI: DI CHUYỂN FILE/FOLDER ---
-  const handleMoveItem = async (dragId: string, targetFolderId: string) => {
-    if (dragId === targetFolderId) return // Không thể thả vào chính nó
+  // HÀM MỞ POPUP SHARE
+  const handleOpenShare = (node: TreeNode) => {
+    const fullDeckInfo = allItems.find(i => i.id === node.id)
+    if (fullDeckInfo) {
+      setShareDialog({ open: true, deck: fullDeckInfo })
+    }
+  }
 
-    // Optimistic Update
+  const handleMoveItem = async (dragId: string, targetFolderId: string) => {
+    if (dragId === targetFolderId) return
+
     setAllItems(prev => prev.map(item => 
         item.id === dragId ? { ...item, parent_id: targetFolderId } : item
     ))
@@ -141,7 +152,7 @@ export default function Home() {
     
     if (error) {
         toast.error("Lỗi khi di chuyển")
-        fetchAllData() // Revert
+        fetchAllData() 
     } else {
         toast.success("Đã di chuyển thành công")
     }
@@ -151,7 +162,12 @@ export default function Home() {
     const nodes = allItems
     const buildTree = (parentId: string | null): TreeNode[] => {
       return nodes.filter(node => node.parent_id === parentId).map(node => ({
-          id: node.id, name: node.name, type: node.type, status: node.status, children: buildTree(node.id)
+          id: node.id, 
+          name: node.name, 
+          type: node.type, 
+          status: node.status, 
+          is_downloaded: node.is_downloaded,
+          children: buildTree(node.id)
         }))
     }
     return buildTree(null)
@@ -159,7 +175,6 @@ export default function Home() {
 
   const handleDragStart = (e: React.DragEvent, node: TreeNode) => { e.dataTransfer.setData("deckId", node.id) }
   
-  // Xử lý drop vào Kanban (Thay đổi trạng thái)
   const handleDropKanban = async (e: React.DragEvent, newStatus: 'IN_PROGRESS' | 'DONE') => {
     e.preventDefault(); const deckId = e.dataTransfer.getData("deckId"); if (!deckId) return
     const updatedItems = allItems.map(item => item.id === deckId ? { ...item, status: newStatus } : item)
@@ -188,6 +203,18 @@ export default function Home() {
                <button onClick={fetchAllData} className="p-1 hover:bg-zinc-100 rounded" title="Tải lại"><RefreshCcw className="h-3.5 w-3.5 text-zinc-600" /></button>
             </div>
         </div>
+
+        <div className="p-3 border-b border-zinc-200 bg-white">
+            <Button 
+                onClick={() => router.push('/explore')} 
+                variant="outline" 
+                className="w-full gap-2 text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100 shadow-sm transition-all"
+            >
+                <Globe className="h-4 w-4" />
+                Khám phá Cộng đồng
+            </Button>
+        </div>
+
         <div className="flex-1 overflow-y-auto p-2">
             <FolderTree 
               data={treeData} 
@@ -197,7 +224,8 @@ export default function Home() {
               onDelete={handleDelete}
               onNavigate={handleNavigate}
               onRename={openRenameDialog}
-              onMove={handleMoveItem} // <--- TRUYỀN HÀM DI CHUYỂN
+              onShare={handleOpenShare} // <--- TRUYỀN HÀM XUỐNG CÂY
+              onMove={handleMoveItem} 
             />
         </div>
         <div className="p-3 bg-zinc-100 text-[10px] text-zinc-400 text-center border-t border-zinc-200 hidden md:block">
@@ -219,7 +247,13 @@ export default function Home() {
                             <span className="text-[10px] font-bold uppercase text-zinc-400 border px-1 rounded">{deck.type}</span>
                             <button onClick={(e) => { e.stopPropagation(); handleDelete(deck.id, deck.type) }} className="p-1 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Settings className="h-3 w-3" /></button>
                         </div>
-                        <h3 className={cn("font-semibold text-sm text-zinc-800 mb-3", status === 'DONE' && "line-through")}>{deck.name}</h3>
+                        
+                        {/* ĐÃ FIX: Bọc title vào thẻ span */}
+                        <h3 className={cn("font-semibold text-sm text-zinc-800 mb-3 flex items-start gap-1.5", status === 'DONE' && "line-through")}>
+                            <span className="flex-1 line-clamp-2">{deck.name}</span>
+                            {deck.is_downloaded && <span title="Khóa học tải từ cộng đồng"><CloudDownload className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" /></span>}
+                        </h3>
+                        
                         {status === 'IN_PROGRESS' && (
                             <div className="space-y-1">
                                 <div className="flex justify-between text-[10px] text-zinc-400"><span className="flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Tiến độ ({deck.total_cards || 0} từ)</span><span>{deck.progress_percent || 0}%</span></div>
@@ -237,7 +271,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans text-zinc-900 overflow-hidden fixed inset-0">
       
-      {/* CÁC DIALOG TOÀN CỤC */}
       <CreateDeckDialog 
         open={createDialog.open}
         onOpenChange={(val) => setCreateDialog(prev => ({ ...prev, open: val }))}
@@ -256,7 +289,14 @@ export default function Home() {
         onRenamed={fetchAllData}
       />
 
-      {/* ... Header và Sidebar giữ nguyên ... */}
+      {/* POPUP SHARE ĐƯỢC NHÚNG VÀO ĐÂY */}
+      <ShareDeckDialog 
+        externalOpen={shareDialog.open}
+        onExternalOpenChange={(val) => setShareDialog(prev => ({ ...prev, open: val }))}
+        deck={shareDialog.deck}
+        onUpdated={fetchAllData}
+      />
+
       <header className="h-14 border-b border-zinc-200 bg-white flex items-center justify-between px-4 sticky top-0 z-50 shrink-0">
         <div className="flex items-center gap-3">
             <div className="md:hidden">
@@ -294,7 +334,6 @@ export default function Home() {
                     </div>
                 </Tabs>
                 
-                {/* FIX LỖI FAB MOBILE: Dùng Button thường gọi hàm, không lồng Dialog */}
                 <div className="absolute bottom-6 right-6 z-50">
                     <Button 
                         onClick={() => openCreateFile(null)} 

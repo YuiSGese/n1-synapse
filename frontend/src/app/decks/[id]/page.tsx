@@ -9,9 +9,11 @@ import { ArrowLeft, BookOpen, Layers, PlayCircle } from 'lucide-react'
 import { SmartVocabEntry } from '@/components/deck/smart-vocab-entry'
 import { StoryGenerator } from '@/components/deck/story-generator'
 import { ReviewManager } from '@/components/deck/review/review-manager'
-import { EditableVocabRow } from '@/components/deck/editable-vocab-row' // <--- IMPORT COMPONENT EDIT MỚI
+import { EditableVocabRow } from '@/components/deck/editable-vocab-row'
+import { ShareDeckDialog } from '@/components/deck/share-deck-dialog'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
+import { CloudDownload } from 'lucide-react' // <--- IMPORT THÊM ICON
 
 export default function DeckDetailPage() {
   const params = useParams()
@@ -69,6 +71,7 @@ export default function DeckDetailPage() {
   }
 
   const simpleVocabList = vocabList.map(v => v.word)
+  const isReadOnly = deck?.is_downloaded === true // <--- KIỂM TRA READ ONLY
 
   // Nếu đang tải hoặc chưa có deck (đang redirect), hiện màn hình chờ
   if (loading || !deck) {
@@ -116,15 +119,22 @@ export default function DeckDetailPage() {
           
           {/* TAB 1: DANH SÁCH */}
           <TabsContent value="vocab" className="p-4 md:p-6 max-w-5xl mx-auto space-y-6 mt-0 h-full">
-            <div className="flex items-center gap-2 mb-4">
-                <h2 className="text-xl font-bold">{deck.name}</h2>
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                    {deck.name}
+                    {isReadOnly && <CloudDownload className="h-5 w-5 text-blue-500" title="Khóa học tải về" />}
+                </h2>
                 <Badge variant="outline" className="text-zinc-500 font-normal">{deck.type}</Badge>
                 <span className="text-xs text-zinc-400">({vocabList.length} từ)</span>
+                
+                {/* NÚT CHIA SẺ - Ẩn nếu là hàng tải về */}
+                <div className="flex-1 min-w-[20px]"></div>
+                {!isReadOnly && <ShareDeckDialog deck={deck} onUpdated={fetchDeckInfo} />}
             </div>
 
-            <SmartVocabEntry deckId={params.id as string} onAdded={fetchVocab} />
+            {/* FORM THÊM TỪ - Ẩn nếu là hàng tải về */}
+            {!isReadOnly && <SmartVocabEntry deckId={params.id as string} onAdded={fetchVocab} />}
             
-            {/* THAY THẾ TABLE CŨ BẰNG EDITABLE ROW MỚI */}
             <div className="border border-zinc-200 rounded-lg overflow-hidden shadow-sm bg-white">
                 {/* Header của danh sách */}
                 <div className="flex items-center p-4 py-3 border-b border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-500 uppercase tracking-wider">
@@ -142,7 +152,8 @@ export default function DeckDetailPage() {
                                 key={vocab.id} 
                                 vocab={vocab} 
                                 onDelete={handleDeleteVocab} 
-                                onUpdated={fetchVocab} 
+                                onUpdated={fetchVocab}
+                                isReadOnly={isReadOnly} // <--- TRUYỀN CỜ XUỐNG DÒNG
                             />
                         ))
                     )}
