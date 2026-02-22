@@ -140,12 +140,13 @@ async def lookup_word(req: VocabRequest):
                 cache_entry = {
                     "word": word,
                     "reading": data.get("reading"),
+                    "kanji_meaning": data.get("kanji_meaning"),
                     "meaning": data.get("meaning"),
                     "part_of_speech": data.get("part_of_speech"),
                     "example_sentence": data.get("example_sentence"),
                     "example_translation": data.get("example_translation"),
-                    "example_sentence_2": data.get("example_sentence_2"),  # <--- THÊM DÒNG NÀY
-                    "example_translation_2": data.get("example_translation_2")  # <--- THÊM DÒNG NÀY
+                    "example_sentence_2": data.get("example_sentence_2"),
+                    "example_translation_2": data.get("example_translation_2")
                 }
                 
                 async with httpx.AsyncClient() as client:
@@ -171,7 +172,6 @@ async def lookup_word(req: VocabRequest):
 
 @app.post("/api/ai/generate_story")
 async def generate_story(req: StoryRequest):
-    # ... (Giữ nguyên logic tạo truyện như cũ) ...
     if not gemini_client: raise HTTPException(status_code=500, detail="Chưa cấu hình AI")
     try:
         vocab_str = ", ".join(req.vocab_list)
