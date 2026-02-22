@@ -83,6 +83,16 @@ export function QuizMultipleChoice({ vocab, allVocabs, mode, direction = 'forwar
   // Chỉ hiện Âm Hán Việt nếu đang học xuôi (hiển thị Kanji ở câu hỏi) và có dữ liệu
   const showKanjiMeaning = !isReverse && !!vocab.kanji_meaning
 
+  // XÁC ĐỊNH NỘI DUNG GỢI Ý / ĐÁP ÁN (Hiện ra sau khi user chọn)
+  let hintText = ""
+  if (mode === 'meaning') {
+      // Nếu là quiz Chọn Nghĩa (dù xuôi hay ngược) -> Gợi ý luôn là Cách đọc Hiragana
+      hintText = cleanText(vocab.reading)
+  } else if (mode === 'reading') {
+      // Nếu là quiz Chọn Cách Đọc (dù xuôi hay ngược) -> Gợi ý luôn là Nghĩa
+      hintText = vocab.meaning
+  }
+
   return (
     <div className="flex flex-col items-center justify-center h-full w-full max-w-lg mx-auto p-4 animate-in zoom-in-95 duration-300">
       
@@ -101,18 +111,27 @@ export function QuizMultipleChoice({ vocab, allVocabs, mode, direction = 'forwar
            </div>
         )}
 
-        {/* Text Câu hỏi (Chỉnh size nhỏ hơn nếu là Nghĩa tiếng Việt dài) */}
+        {/* Text Câu hỏi */}
+        {/* 👉 ĐIỀU CHỈNH FONT SIZE TỪ VỰNG Ở ĐÂY 👈 */}
+        {/* Thay đổi "text-5xl md:text-6xl" (cho học xuôi) hoặc "text-3xl md:text-4xl" (cho học ngược) tùy ý bạn */}
         <h2 className={cn(
             "font-black text-zinc-900 text-center break-words leading-tight",
-            isReverse ? "text-4xl md:text-5xl" : "text-6xl md:text-7xl"
+            isReverse ? "text-3xl md:text-4xl" : "text-5xl md:text-6xl"
         )}>
           {questionText}
         </h2>
         
-        {/* Gợi ý sau khi trả lời (Tùy chọn) */}
-        {isAnswered && !isReverse && mode === 'meaning' && (
-           <p className="text-zinc-400 mt-4 font-light text-xl animate-in fade-in">{cleanText(vocab.reading)}</p>
-        )}
+        {/* Khối hiển thị Gợi ý sau khi trả lời */}
+        {/* 👉 Dùng min-h-[32px] để luôn giữ sẵn 1 khoảng trống, giúp màn hình KHÔNG BỊ GIẬT khi text hiện ra */}
+        <div className={cn(
+            "mt-4 transition-opacity duration-300 min-h-[32px] flex items-center justify-center",
+            isAnswered ? "opacity-100" : "opacity-0"
+        )}>
+           {/* 👉 ĐIỀU CHỈNH FONT SIZE CỦA PHẦN GỢI Ý Ở ĐÂY (đang là text-lg md:text-xl) 👈 */}
+           <p className="text-zinc-500 font-medium text-lg md:text-xl text-center">
+               {hintText}
+           </p>
+        </div>
       </div>
 
       {/* ĐÁP ÁN */}

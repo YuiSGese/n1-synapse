@@ -81,6 +81,7 @@ export function QuizMatching({ vocabBatch, onComplete }: QuizMatchingProps) {
 
         // Kiểm tra xem hết bài chưa
         if (newCards.every(c => c.isMatched)) {
+          // TĂNG ĐỘ TRỄ LÊN 2S (2000ms)
           setTimeout(() => {
             // Tổng kết điểm: Những từ nào không nằm trong set mistakes là đúng (isCorrect: true)
             const results = vocabBatch.map(v => ({
@@ -88,7 +89,7 @@ export function QuizMatching({ vocabBatch, onComplete }: QuizMatchingProps) {
               isCorrect: !mistakes.has(v.id)
             }))
             onComplete(results)
-          }, 1000)
+          }, 2000) 
         }
       } else {
         // WRONG: Sai cặp!

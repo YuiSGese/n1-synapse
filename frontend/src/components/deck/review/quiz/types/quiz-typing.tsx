@@ -23,15 +23,18 @@ interface QuizTypingProps {
 export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
   const [input, setInput] = useState('')
   const [status, setStatus] = useState<'idle' | 'wrong' | 'correct'>('idle')
-  const [hasFailed, setHasFailed] = useState(false)
   const [showAnswer, setShowAnswer] = useState(false)
   const [countdown, setCountdown] = useState(3)
-  
-  // THÊM MỚI: Theo dõi trạng thái của bộ gõ IME (đang gõ hay đã chốt chữ)
   const [isComposing, setIsComposing] = useState(false)
 
   const inputRef = useRef<HTMLInputElement>(null)
   const sessionStarted = useRef(false)
+  
+  // Dùng Ref để lưu trữ hàm onResult mới nhất, tránh lỗi closure
+  const onResultRef = useRef(onResult)
+  useEffect(() => {
+    onResultRef.current = onResult
+  }, [onResult])
 
   const correctReading = vocab.reading
     ? vocab.reading.split('(')[0].trim()
@@ -45,16 +48,15 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
     }
   }, [])
 
-  // 2. Reset state khi sang từ mới
+  // 2. Reset state khi sang từ mới (Cực kỳ quan trọng để dọn dẹp data cũ)
   useEffect(() => {
     setInput('')
     setStatus('idle')
     setShowAnswer(false)
-    setHasFailed(false) // Nên reset cả trạng thái fail cho từ mới
-    setIsComposing(false) // Reset trạng thái IME
+    setIsComposing(false)
+    setCountdown(3) // <--- Reset lại bộ đếm về 3s cho câu hỏi mới
     
-    // Đánh thức lại con trỏ nhấp nháy trên iOS sau khi đã xóa sạch chữ cũ.
-    // Nếu bàn phím đang mở sẵn, thao tác này không làm giật màn hình mà giúp con trỏ (caret) không bị kẹt.
+    // Đánh thức lại con trỏ nhấp nháy trên iOS
     if (document.activeElement !== inputRef.current) {
       inputRef.current?.focus()
     }
@@ -67,39 +69,32 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
       status === 'idle' &&
       !showAnswer &&
       input === correctReading &&
-      !isComposing // QUAN TRỌNG: Chỉ auto-submit khi người dùng đã chốt chữ (không còn gạch chân dưới chữ)
+      !isComposing
     ) {
       handleSubmit()
     }
-    // Cần thêm isComposing và các dependency khác để theo dõi sát sao
   }, [input, isComposing, status, showAnswer, correctReading])
 
-  // 4. Countdown khi sai
+  // 4. Đồng hồ đếm ngược 3s khi trả lời sai (Chỉ làm nhiệm vụ đếm số)
   useEffect(() => {
     let timer: NodeJS.Timeout
 
-    if (showAnswer) {
-      speakText(vocab.word)
-      setCountdown(3)
-
+    // Chỉ chạy timer khi showAnswer = true và đếm ngược vẫn còn lớn hơn 0
+    if (showAnswer && countdown > 0) {
       timer = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer)
-            setShowAnswer(false)
-            setStatus('idle')
-            setInput('')
-            // Focus lại sau khi hết thời gian đếm ngược
-            inputRef.current?.focus()
-            return 0
-          }
-          return prev - 1
-        })
+        setCountdown((prev) => prev - 1)
       }, 1000)
     }
 
     return () => clearInterval(timer)
-  }, [showAnswer, vocab.word])
+  }, [showAnswer, countdown])
+
+  // 5. Gửi kết quả khi thời gian kết thúc (Tách side-effect ra khỏi hàm tính toán State để fix lỗi lặp câu)
+  useEffect(() => {
+    if (showAnswer && countdown === 0) {
+      onResultRef.current(false)
+    }
+  }, [showAnswer, countdown])
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -110,13 +105,15 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
       setStatus('correct')
       speakText(vocab.word)
 
+      // Chờ 1s khi đúng rồi chuyển sang câu mới
       setTimeout(() => {
-        onResult(!hasFailed)
-      }, 700)
+        onResultRef.current(true)
+      }, 1000) 
     } else {
       setStatus('wrong')
-      setHasFailed(true)
       setShowAnswer(true)
+      setCountdown(3) // Bắt đầu đếm ngược
+      speakText(vocab.word) // Phát âm mẫu luôn khi sai để người dùng ghi nhớ
     }
   }
 
@@ -150,15 +147,13 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
                 setInput(e.target.value)
                 if (status === 'wrong') setStatus('idle')
               }}
-              // THÊM MỚI: Bắt sự kiện bắt đầu và kết thúc gõ IME để chặn auto-submit sai thời điểm
               onCompositionStart={() => setIsComposing(true)}
               onCompositionEnd={() => setIsComposing(false)}
-
               placeholder="nhập hiragana"
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
-              
+              readOnly={status === 'correct' || showAnswer} // Khóa bàn phím khi đang show đáp án
               className={cn(
                 "h-14 pr-14 pl-6 text-center text-lg font-bold rounded-2xl border-2 transition-all duration-300 shadow-sm placeholder:font-normal placeholder:text-zinc-300",
                 status === 'correct' && "border-green-500 bg-green-50 text-green-900",
@@ -173,7 +168,6 @@ export function QuizTyping({ vocab, onResult }: QuizTypingProps) {
                 type="submit"
                 size="icon"
                 disabled={showAnswer || !input.trim()}
-                // QUAN TRỌNG: Giữ nguyên để tránh mất focus khi user cố tình bấm nút
                 onMouseDown={(e) => e.preventDefault()}
                 className={cn(
                   "h-full w-10 rounded-xl transition-all shadow-none",
